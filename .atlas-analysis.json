@@ -1,0 +1,104 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "React NEAR TypeScript",
+  "projectDescription": "TypeScript-first React wrapper for NEAR Protocol with wallet integration and React Query hooks",
+  "theme": "palm",
+  "primaryColor": "#00C1DE",
+  "lightColor": "#70D4E4",
+  "darkColor": "#0099B8",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/providers",
+              "concepts/network-configuration",
+              "concepts/wallet-connection"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/reading-account-info",
+              "guides/contract-interactions",
+              "guides/sending-transactions",
+              "guides/custom-setup"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Hooks",
+            "pages": [
+              "api/hooks/use-near-connector",
+              "api/hooks/use-connected-account",
+              "api/hooks/use-account-info",
+              "api/hooks/use-contract-read-function",
+              "api/hooks/use-execute-transaction"
+            ]
+          },
+          {
+            "group": "Providers",
+            "pages": [
+              "api/providers/mainnet-near-provider",
+              "api/providers/testnet-near-provider",
+              "api/providers/near-provider"
+            ]
+          },
+          {
+            "group": "Store",
+            "pages": [
+              "api/store/create-near-store",
+              "api/store/create-near-connector-service"
+            ]
+          },
+          {
+            "group": "Re-exports",
+            "pages": [
+              "api/reexports/client-creators",
+              "api/reexports/action-creators",
+              "api/reexports/utilities"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "TypeScript-first React hooks for NEAR Protocol",
+    "Built-in wallet connection via @hot-labs/near-connect",
+    "React Query integration for account and contract data",
+    "Pre-configured providers for mainnet and testnet",
+    "Transaction execution with automatic signer management",
+    "Contract read/write operations with custom deserialization"
+  ],
+  "publicApiSurface": [
+    "useNearConnector",
+    "useConnectedAccount",
+    "useAccountInfo",
+    "useContractReadFunction",
+    "useExecuteTransaction",
+    "MainnetNearProvider",
+    "TestnetNearProvider",
+    "NearProvider",
+    "createNearStore",
+    "createNearConnectorService",
+    "createClient",
+    "transfer",
+    "functionCall"
+  ]
+}
