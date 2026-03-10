@@ -1,0 +1,111 @@
+---
+title: Reading Account Info
+description: Learn how to fetch and display account information using the useAccountInfo hook
+---
+
+The `useAccountInfo` hook allows you to fetch account details from the NEAR blockchain, including balance, storage usage, and more.
+
+## Basic Usage
+
+Fetch account information for any NEAR account:
+
+```tsx
+import { useAccountInfo } from 'react-near-ts';
+
+function AccountBalance() {
+  const accountInfo = useAccountInfo({ accountId: 'example.testnet' });
+
+  if (accountInfo.isSuccess) {
+    console.log(accountInfo.data.accountInfo.balance.total.near);
+  }
+
+  return (
+    <div>
+      {accountInfo.isPending && <p>Loading...</p>}
+      {accountInfo.isError && <p>Error loading account</p>}
+      {accountInfo.isSuccess && (
+        <p>Balance: {accountInfo.data.accountInfo.balance.total.near} NEAR</p>
+      )}
+    </div>
+  );
+}
+```
+
+## Getting Connected Account Info
+
+Combine `useAccountInfo` with `useConnectedAccount` to display the current user's account information:
+
+```tsx
+import { useAccountInfo, useConnectedAccount } from 'react-near-ts';
+
+function MyAccountInfo() {
+  const { connectedAccountId, isConnectedAccount } = useConnectedAccount();
+  const accountInfo = useAccountInfo({ accountId: connectedAccountId });
+
+  if (!isConnectedAccount) {
+    return <p>Connect your wallet to see your account info</p>;
+  }
+
+  if (accountInfo.isPending) {
+    return <p>Loading account details...</p>;
+  }
+
+  if (accountInfo.isError) {
+    return <p>Failed to load account info</p>;
+  }
+
+  const { balance, usedStorageBytes } = accountInfo.data.accountInfo;
+
+  return (
+    <div>
+      <h2>Account: {accountInfo.data.accountId}</h2>
+      <p>Storage Used: {usedStorageBytes} bytes</p>
+      <p>Total Balance: {balance.total.near} NEAR</p>
+      <p>Available Balance: {balance.available.near} NEAR</p>
+      <p>Locked Balance: {balance.locked.amount.near} NEAR</p>
+    </div>
+  );
+}
+```
+
+## Response Data
+
+The `useAccountInfo` hook returns a query result with the following data structure:
+
+```typescript
+{
+  accountId: string;
+  accountInfo: {
+    balance: {
+      total: { near: string; yoctoNear: string };
+      available: { near: string; yoctoNear: string };
+      locked: {
+        amount: { near: string; yoctoNear: string };
+      };
+    };
+    usedStorageBytes: number;
+    // ... other account properties
+  };
+}
+```
+
+<Note>
+  The hook uses TanStack Query under the hood, so you get automatic caching, refetching, and error handling.
+</Note>
+
+## Query Options
+
+You can pass additional query options to control the behavior:
+
+```tsx
+const accountInfo = useAccountInfo({
+  accountId: 'example.testnet',
+  query: {
+    enabled: true, // Disable automatic fetching
+  },
+});
+```
+
+<Tip>
+  The query is automatically disabled when `accountId` is `undefined`, making it safe to use with `connectedAccountId` before the user connects.
+</Tip>

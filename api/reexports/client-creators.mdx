@@ -1,0 +1,138 @@
+---
+title: "Client Creators"
+description: "NEAR RPC client creator functions re-exported from near-api-ts"
+---
+
+`react-near-ts` re-exports client creator functions from `near-api-ts` for convenience. These functions create NEAR RPC clients configured for different networks.
+
+## Overview
+
+Client creators are factory functions that return configured NEAR RPC clients. You typically use these when setting up a custom `NearProvider` configuration.
+
+<Info>
+When using `MainnetNearProvider` or `TestnetNearProvider`, clients are created automatically. You only need these functions for custom setups.
+</Info>
+
+## Available Functions
+
+### `createMainnetClient`
+
+Creates a NEAR RPC client pre-configured for mainnet.
+
+```tsx
+import { createMainnetClient } from 'react-near-ts';
+
+const client = createMainnetClient();
+```
+
+**Returns:** A NEAR RPC client configured with mainnet endpoints.
+
+**Use case:** Quick setup for mainnet applications without custom configuration.
+
+---
+
+### `createTestnetClient`
+
+Creates a NEAR RPC client pre-configured for testnet.
+
+```tsx
+import { createTestnetClient } from 'react-near-ts';
+
+const client = createTestnetClient();
+```
+
+**Returns:** A NEAR RPC client configured with testnet endpoints.
+
+**Use case:** Development and testing with the NEAR testnet.
+
+---
+
+### `createClient`
+
+Creates a custom NEAR RPC client with your own configuration.
+
+```tsx
+import { createClient } from 'react-near-ts';
+
+const client = createClient({
+  transport: {
+    rpcEndpoints: {
+      regular: [{ url: 'https://free.rpc.fastnear.com' }],
+      archival: [{ url: 'https://1rpc.io/near' }],
+    },
+  },
+});
+```
+
+**Parameters:**
+
+<ParamField path="config" type="object" required>
+  Client configuration object
+  
+  <Expandable title="properties">
+    <ParamField path="transport" type="object" required>
+      Transport configuration
+      
+      <Expandable title="properties">
+        <ParamField path="rpcEndpoints" type="object" required>
+          RPC endpoint configuration
+          
+          <Expandable title="properties">
+            <ParamField path="regular" type="array" required>
+              Regular RPC endpoints (non-archival)
+            </ParamField>
+            <ParamField path="archival" type="array">
+              Archival RPC endpoints for historical data
+            </ParamField>
+          </Expandable>
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+**Returns:** A NEAR RPC client configured with your custom endpoints.
+
+**Use case:** When you need custom RPC endpoints, load balancing, or specific network configurations.
+
+## Usage in Custom Setup
+
+Here's how to use client creators with `NearProvider`:
+
+```tsx App.tsx
+import {
+  NearProvider,
+  createNearStore,
+  createClient,
+  createNearConnectorService,
+} from 'react-near-ts';
+
+const clientCreator = () => createClient({
+  transport: {
+    rpcEndpoints: {
+      regular: [{ url: 'https://free.rpc.fastnear.com' }],
+      archival: [{ url: 'https://1rpc.io/near' }],
+    },
+  },
+});
+
+const nearStore = createNearStore({
+  networkId: 'mainnet',
+  clientCreator,
+  serviceCreator: createNearConnectorService({ networkId: 'mainnet' }),
+});
+
+export const App = ({ children }: { children: React.ReactNode }) => (
+  <NearProvider nearStore={nearStore}>{children}</NearProvider>
+);
+```
+
+## Learn More
+
+<Card title="Custom Setup Guide" icon="gear" href="/guides/custom-setup">
+  Learn how to configure custom RPC endpoints and network settings
+</Card>
+
+<Card title="near-api-ts Documentation" icon="arrow-up-right-from-square" href="https://github.com/near/near-api-ts">
+  Official near-api-ts documentation on GitHub
+</Card>

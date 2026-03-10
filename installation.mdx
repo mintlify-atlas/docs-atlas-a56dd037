@@ -1,0 +1,80 @@
+---
+title: Installation
+description: Install react-near-ts and required dependencies
+---
+
+## Package Manager
+
+Install `react-near-ts` along with its peer dependencies using your preferred package manager:
+
+<CodeGroup>
+
+```bash npm
+npm install react-near-ts react react-dom @tanstack/react-query zod
+```
+
+```bash yarn
+yarn add react-near-ts react react-dom @tanstack/react-query zod
+```
+
+```bash pnpm
+pnpm add react-near-ts react react-dom @tanstack/react-query zod
+```
+
+</CodeGroup>
+
+## Peer Dependencies
+
+The following peer dependencies are required:
+
+| Package | Version Range | Purpose |
+|---------|---------------|----------|
+| `react` | `>=19.2.0 <20` | React library |
+| `react-dom` | `>=19.2.0 <20` | React DOM renderer |
+| `@tanstack/react-query` | `>=5.90.21 <6` | Data fetching and caching |
+| `zod` | `>=4.3.0 <5` | Runtime type validation |
+
+<Note>
+  These dependencies are marked as peer dependencies, so you must install them explicitly in your project.
+</Note>
+
+## Bundled Dependencies
+
+The following packages are included automatically:
+
+- **`near-api-ts`** (v0.8.0) - NEAR Protocol JavaScript API
+- **`@hot-labs/near-connect`** (^0.10.0) - Wallet connection library
+- **`zustand`** (^5.0.11) - State management
+
+## Verify Installation
+
+After installation, verify that the package is available by importing it:
+
+```tsx
+import { TestnetNearProvider, useNearConnector } from 'react-near-ts';
+```
+
+If you see TypeScript errors, ensure all peer dependencies are installed with compatible versions.
+
+## TypeScript Configuration
+
+`react-near-ts` is built with TypeScript and provides full type definitions out of the box. Ensure your `tsconfig.json` includes:
+
+```json tsconfig.json
+{
+  "compilerOptions": {
+    "moduleResolution": "bundler",
+    "module": "ESNext",
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "strict": true
+  }
+}
+```
+
+## Next Steps
+
+<Card title="Quick Start" icon="rocket" href="/quickstart">
+  Build your first NEAR app with react-near-ts
+</Card>

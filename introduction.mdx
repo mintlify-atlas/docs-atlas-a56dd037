@@ -1,0 +1,69 @@
+---
+title: Introduction
+description: TypeScript-first React wrapper for NEAR Protocol with built-in wallet connection
+---
+
+`react-near-ts` is a modern, TypeScript-first React library for building applications on NEAR Protocol. It provides a seamless integration between React and `near-api-ts`, with built-in wallet connection support via `@hot-labs/near-connect`.
+
+## Key Features
+
+- **TypeScript-first**: Full type safety with excellent IDE support
+- **React Query Integration**: Built on `@tanstack/react-query` for efficient data fetching and caching
+- **Wallet Connection**: Seamless wallet integration with `@hot-labs/near-connect`
+- **Zero Configuration**: Get started with pre-configured providers for mainnet and testnet
+- **Flexible Setup**: Customize RPC endpoints, network settings, and more
+- **Complete API Coverage**: Access all NEAR functionality through React hooks
+
+## What You Can Build
+
+With `react-near-ts`, you can build:
+
+- **DeFi Applications**: Token transfers, staking, and liquidity pools
+- **NFT Marketplaces**: Mint, buy, sell, and display NFTs
+- **DAOs**: Governance and voting applications
+- **Social Apps**: On-chain social features and profiles
+- **Gaming**: Blockchain-based games with wallet integration
+
+## Core Concepts
+
+### Providers
+
+`react-near-ts` uses React Context to provide NEAR functionality throughout your application. Choose from:
+
+- `MainnetNearProvider` - Pre-configured for NEAR mainnet
+- `TestnetNearProvider` - Pre-configured for NEAR testnet  
+- `NearProvider` - Custom configuration with your own RPC endpoints
+
+### Hooks
+
+The library provides React hooks for all NEAR operations:
+
+- **`useNearConnector`** - Connect and disconnect wallets
+- **`useConnectedAccount`** - Access the current connected account
+- **`useAccountInfo`** - Fetch account balances and details
+- **`useContractReadFunction`** - Call view methods on smart contracts
+- **`useExecuteTransaction`** - Send signed transactions
+
+### State Management
+
+Internal state is managed using Zustand, while asynchronous operations leverage React Query for:
+
+- Automatic caching
+- Background refetching
+- Optimistic updates
+- Error handling
+
+## Live Demo
+
+See `react-near-ts` in action: [https://react-near-ts-next-playground.vercel.app](https://react-near-ts-next-playground.vercel.app)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install react-near-ts and its dependencies
+  </Card>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Build your first NEAR app in minutes
+  </Card>
+</CardGroup>

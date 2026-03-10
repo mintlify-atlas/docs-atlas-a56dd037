@@ -1,0 +1,92 @@
+---
+title: MainnetNearProvider
+description: Pre-configured provider for NEAR mainnet
+---
+
+`MainnetNearProvider` is a convenience wrapper around `NearProvider` that automatically configures your application for the NEAR mainnet network.
+
+## Component Signature
+
+```tsx
+const MainnetNearProvider: (props: { children: ReactNode }) => JSX.Element
+```
+
+## Props
+
+<ParamField path="children" type="ReactNode" required>
+  The child components that will have access to the NEAR mainnet context.
+</ParamField>
+
+## Usage
+
+### Basic Setup
+
+Wrap your application with `MainnetNearProvider` to connect to NEAR mainnet:
+
+```tsx
+import { MainnetNearProvider } from 'react-near-ts';
+
+export const App = () => (
+  <MainnetNearProvider>
+    <h1>Hello, Near!</h1>
+  </MainnetNearProvider>
+);
+```
+
+### With Router (Next.js App Router)
+
+```tsx
+import { MainnetNearProvider } from 'react-near-ts';
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <MainnetNearProvider>
+          {children}
+        </MainnetNearProvider>
+      </body>
+    </html>
+  );
+}
+```
+
+### Accessing NEAR Functionality
+
+Once wrapped, child components can use all NEAR hooks:
+
+```tsx
+import { useNearConnect } from 'react-near-ts';
+
+function ConnectButton() {
+  const { connect, disconnect, isConnected } = useNearConnect();
+
+  return (
+    <button onClick={isConnected ? disconnect : connect}>
+      {isConnected ? 'Disconnect' : 'Connect Wallet'}
+    </button>
+  );
+}
+```
+
+## Implementation Details
+
+`MainnetNearProvider` creates a NEAR store configured for mainnet with:
+
+- **Network ID**: `mainnet`
+- **Client**: Mainnet RPC client from `near-api-ts`
+- **Services**: NEAR Connector service for mainnet
+
+<Info>
+  This provider is the recommended way to connect to NEAR mainnet. For custom RPC endpoints or advanced configuration, use the `NearProvider` component directly.
+</Info>
+
+## Related
+
+- [TestnetNearProvider](/api/providers/testnet-near-provider) - Provider for NEAR testnet
+- [NearProvider](/api/providers/near-provider) - Low-level provider for custom configurations
+- [useNearConnector](/api/hooks/use-near-connector) - Hook for wallet connections

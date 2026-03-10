@@ -1,0 +1,427 @@
+---
+title: "Action Creators"
+description: "Transaction action creator functions re-exported from near-api-ts"
+---
+
+`react-near-ts` re-exports action creator functions from `near-api-ts` for building NEAR Protocol transactions. These functions create actions that can be executed via `useExecuteTransaction`.
+
+## Overview
+
+Action creators are functions that generate transaction actions. Combine them with `useExecuteTransaction` to send signed transactions from connected wallets.
+
+## Token Transfer
+
+### `transfer`
+
+Transfers NEAR tokens from the connected account to a receiver.
+
+```tsx
+import { transfer, useExecuteTransaction } from 'react-near-ts';
+
+function SendTokens() {
+  const executeTransaction = useExecuteTransaction();
+
+  const handleSend = () => {
+    executeTransaction.mutate({
+      intent: {
+        action: transfer({ amount: { near: '0.1' } }),
+        receiverAccountId: 'receiver.testnet',
+      },
+    });
+  };
+
+  return <button onClick={handleSend}>Send 0.1 NEAR</button>;
+}
+```
+
+**Parameters:**
+
+<ParamField path="options" type="object" required>
+  Transfer configuration
+  
+  <Expandable title="properties">
+    <ParamField path="amount" type="object" required>
+      Amount to transfer (specify one)
+      
+      <Expandable title="properties">
+        <ParamField path="near" type="string">
+          Amount in NEAR tokens (e.g., `"0.1"`)
+        </ParamField>
+        <ParamField path="yoctoNear" type="string">
+          Amount in yoctoNEAR (e.g., `"100000000000000000000000"`)
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+---
+
+## Contract Interactions
+
+### `functionCall`
+
+Calls a smart contract method that modifies state (requires signing).
+
+```tsx
+import { functionCall, useExecuteTransaction } from 'react-near-ts';
+
+function AddRecord() {
+  const executeTransaction = useExecuteTransaction();
+
+  const handleAdd = () => {
+    executeTransaction.mutate({
+      intent: {
+        action: functionCall({
+          functionName: 'add_record',
+          functionArgs: { record: 'hello world' },
+          gasLimit: { teraGas: '10' },
+          attachedDeposit: { near: '0' },
+        }),
+        receiverAccountId: 'contract.testnet',
+      },
+    });
+  };
+
+  return <button onClick={handleAdd}>Add Record</button>;
+}
+```
+
+**Parameters:**
+
+<ParamField path="options" type="object" required>
+  Function call configuration
+  
+  <Expandable title="properties">
+    <ParamField path="functionName" type="string" required>
+      Name of the contract method to call
+    </ParamField>
+    <ParamField path="functionArgs" type="object">
+      Arguments to pass to the contract method (will be JSON-serialized)
+    </ParamField>
+    <ParamField path="gasLimit" type="object">
+      Gas limit for the transaction
+      
+      <Expandable title="properties">
+        <ParamField path="teraGas" type="string">
+          Gas in TGas (e.g., `"10"` for 10 TGas)
+        </ParamField>
+        <ParamField path="gas" type="string">
+          Gas in base units
+        </ParamField>
+      </Expandable>
+    </ParamField>
+    <ParamField path="attachedDeposit" type="object">
+      NEAR tokens to attach to the call
+      
+      <Expandable title="properties">
+        <ParamField path="near" type="string">
+          Deposit in NEAR (e.g., `"0.1"`)
+        </ParamField>
+        <ParamField path="yoctoNear" type="string">
+          Deposit in yoctoNEAR
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+---
+
+### `deployContract`
+
+Deploys a compiled smart contract to an account.
+
+```tsx
+import { deployContract, useExecuteTransaction } from 'react-near-ts';
+
+function DeployContract() {
+  const executeTransaction = useExecuteTransaction();
+
+  const handleDeploy = async () => {
+    const wasmCode = await fetch('/contract.wasm').then(r => r.arrayBuffer());
+    
+    executeTransaction.mutate({
+      intent: {
+        action: deployContract({ code: new Uint8Array(wasmCode) }),
+        receiverAccountId: 'mycontract.testnet',
+      },
+    });
+  };
+
+  return <button onClick={handleDeploy}>Deploy Contract</button>;
+}
+```
+
+**Parameters:**
+
+<ParamField path="options" type="object" required>
+  <Expandable title="properties">
+    <ParamField path="code" type="Uint8Array" required>
+      Compiled WASM contract bytecode
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+---
+
+## Account Management
+
+### `createAccount`
+
+Creates a new NEAR account.
+
+```tsx
+import { createAccount, useExecuteTransaction } from 'react-near-ts';
+
+function CreateAccount() {
+  const executeTransaction = useExecuteTransaction();
+
+  const handleCreate = () => {
+    executeTransaction.mutate({
+      intent: {
+        action: createAccount(),
+        receiverAccountId: 'newaccount.testnet',
+      },
+    });
+  };
+
+  return <button onClick={handleCreate}>Create Account</button>;
+}
+```
+
+---
+
+### `deleteAccount`
+
+Deletes an account and transfers remaining balance to a beneficiary.
+
+```tsx
+import { deleteAccount, useExecuteTransaction } from 'react-near-ts';
+
+function DeleteAccount() {
+  const executeTransaction = useExecuteTransaction();
+
+  const handleDelete = () => {
+    executeTransaction.mutate({
+      intent: {
+        action: deleteAccount({ beneficiaryAccountId: 'beneficiary.testnet' }),
+        receiverAccountId: 'account-to-delete.testnet',
+      },
+    });
+  };
+
+  return <button onClick={handleDelete}>Delete Account</button>;
+}
+```
+
+**Parameters:**
+
+<ParamField path="options" type="object" required>
+  <Expandable title="properties">
+    <ParamField path="beneficiaryAccountId" type="string" required>
+      Account ID to receive the remaining balance
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+---
+
+## Access Key Management
+
+### `addFullAccessKey`
+
+Adds a full access key to an account.
+
+```tsx
+import { addFullAccessKey, randomEd25519KeyPair, useExecuteTransaction } from 'react-near-ts';
+
+function AddFullAccessKey() {
+  const executeTransaction = useExecuteTransaction();
+
+  const handleAdd = () => {
+    const keyPair = randomEd25519KeyPair();
+    
+    executeTransaction.mutate({
+      intent: {
+        action: addFullAccessKey({ publicKey: keyPair.getPublicKey() }),
+        receiverAccountId: 'myaccount.testnet',
+      },
+    });
+  };
+
+  return <button onClick={handleAdd}>Add Full Access Key</button>;
+}
+```
+
+**Parameters:**
+
+<ParamField path="options" type="object" required>
+  <Expandable title="properties">
+    <ParamField path="publicKey" type="PublicKey" required>
+      Public key to add
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+---
+
+### `addFunctionCallKey`
+
+Adds a function call access key limited to specific contracts and methods.
+
+```tsx
+import { addFunctionCallKey, randomEd25519KeyPair, useExecuteTransaction } from 'react-near-ts';
+
+function AddFunctionCallKey() {
+  const executeTransaction = useExecuteTransaction();
+
+  const handleAdd = () => {
+    const keyPair = randomEd25519KeyPair();
+    
+    executeTransaction.mutate({
+      intent: {
+        action: addFunctionCallKey({
+          publicKey: keyPair.getPublicKey(),
+          allowance: { near: '0.25' },
+          receiverAccountId: 'contract.testnet',
+          functionNames: ['add_record', 'remove_record'],
+        }),
+        receiverAccountId: 'myaccount.testnet',
+      },
+    });
+  };
+
+  return <button onClick={handleAdd}>Add Function Call Key</button>;
+}
+```
+
+**Parameters:**
+
+<ParamField path="options" type="object" required>
+  <Expandable title="properties">
+    <ParamField path="publicKey" type="PublicKey" required>
+      Public key to add
+    </ParamField>
+    <ParamField path="receiverAccountId" type="string" required>
+      Contract account ID the key can call
+    </ParamField>
+    <ParamField path="functionNames" type="string[]">
+      Specific method names allowed (empty array = all methods)
+    </ParamField>
+    <ParamField path="allowance" type="object">
+      Maximum NEAR the key can spend
+      
+      <Expandable title="properties">
+        <ParamField path="near" type="string">
+          Allowance in NEAR tokens
+        </ParamField>
+        <ParamField path="yoctoNear" type="string">
+          Allowance in yoctoNEAR
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+---
+
+### `deleteKey`
+
+Removes an access key from an account.
+
+```tsx
+import { deleteKey, useExecuteTransaction } from 'react-near-ts';
+
+function DeleteKey() {
+  const executeTransaction = useExecuteTransaction();
+
+  const handleDelete = (publicKey: PublicKey) => {
+    executeTransaction.mutate({
+      intent: {
+        action: deleteKey({ publicKey }),
+        receiverAccountId: 'myaccount.testnet',
+      },
+    });
+  };
+
+  return <button onClick={() => handleDelete(/* publicKey */)}>Delete Key</button>;
+}
+```
+
+**Parameters:**
+
+<ParamField path="options" type="object" required>
+  <Expandable title="properties">
+    <ParamField path="publicKey" type="PublicKey" required>
+      Public key to remove
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+---
+
+## Staking
+
+### `stake`
+
+Stakes NEAR tokens to a validator.
+
+```tsx
+import { stake, useExecuteTransaction } from 'react-near-ts';
+
+function StakeTokens() {
+  const executeTransaction = useExecuteTransaction();
+
+  const handleStake = () => {
+    executeTransaction.mutate({
+      intent: {
+        action: stake({
+          amount: { near: '100' },
+          publicKey: /* validator public key */,
+        }),
+        receiverAccountId: 'validator.poolv1.near',
+      },
+    });
+  };
+
+  return <button onClick={handleStake}>Stake 100 NEAR</button>;
+}
+```
+
+**Parameters:**
+
+<ParamField path="options" type="object" required>
+  <Expandable title="properties">
+    <ParamField path="amount" type="object" required>
+      Amount to stake
+      
+      <Expandable title="properties">
+        <ParamField path="near" type="string">
+          Amount in NEAR tokens
+        </ParamField>
+        <ParamField path="yoctoNear" type="string">
+          Amount in yoctoNEAR
+        </ParamField>
+      </Expandable>
+    </ParamField>
+    <ParamField path="publicKey" type="PublicKey" required>
+      Validator's public key
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Learn More
+
+<CardGroup cols={2}>
+  <Card title="useExecuteTransaction" icon="paper-plane" href="/api/hooks/use-execute-transaction">
+    Learn how to execute these actions with the transaction hook
+  </Card>
+  <Card title="Sending Transactions Guide" icon="book" href="/guides/sending-transactions">
+    Step-by-step guide for sending transactions
+  </Card>
+</CardGroup>
+
+<Card title="near-api-ts Documentation" icon="arrow-up-right-from-square" href="https://github.com/near/near-api-ts">
+  Official near-api-ts documentation on GitHub
+</Card>

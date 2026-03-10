@@ -1,0 +1,213 @@
+---
+title: createNearStore
+description: Create a NEAR store instance with Zustand for state management
+---
+
+## Overview
+
+Creates a NEAR store instance that manages wallet connection state, network configuration, and service context. The store uses Zustand for state management and persists the connected account ID across browser sessions.
+
+## Function Signature
+
+```typescript
+function createNearStore(args: CreateNearStoreArgs): NearStore
+```
+
+### Type Definitions
+
+```typescript
+type CreateNearStoreArgs = {
+  networkId: string;
+  clientCreator: () => Client;
+  serviceCreator: NearConnectServiceCreator;
+  storeName?: string;
+};
+
+type NearStore = StoreApi<NearState>;
+
+type NearState = {
+  networkId: string;
+  connectedAccountId?: AccountId;
+  getContext: () => StoreContext;
+  setSigners: (connectedAccountId: AccountId) => void;
+  clearSigners: () => void;
+  setConnectedAccountId: (connectedAccountId?: AccountId) => void;
+};
+
+type StoreContext = {
+  serviceCreators: ServiceCreator[];
+  client: Client;
+  services: Record<ServiceId, Service>;
+  signers: Signer[];
+};
+```
+
+## Parameters
+
+<ParamField path="networkId" type="string" required>
+  The NEAR network identifier. Use `'mainnet'` for production or `'testnet'` for testing.
+</ParamField>
+
+<ParamField path="clientCreator" type="() => Client" required>
+  A function that returns a NEAR API client instance. Use `createClient()`, `createMainnetClient()`, or `createTestnetClient()` from `near-api-ts`.
+</ParamField>
+
+<ParamField path="serviceCreator" type="NearConnectServiceCreator" required>
+  A service creator that provides wallet connection functionality. Typically created using `createNearConnectorService()`.
+</ParamField>
+
+<ParamField path="storeName" type="string" default="'react-near-ts'">
+  Optional custom name for the store. Used as a prefix for the localStorage persistence key in the format `{storeName}:{networkId}`.
+</ParamField>
+
+## Returns
+
+<ResponseField name="NearStore" type="StoreApi<NearState>">
+  A Zustand store instance containing the NEAR state and methods.
+
+  <Expandable title="NearState properties">
+    <ResponseField name="networkId" type="string">
+      The NEAR network identifier passed during store creation.
+    </ResponseField>
+
+    <ResponseField name="connectedAccountId" type="AccountId | undefined">
+      The currently connected account ID, or `undefined` if no wallet is connected.
+    </ResponseField>
+
+    <ResponseField name="getContext" type="() => StoreContext">
+      Returns the store context containing service creators, client, services, and signers.
+    </ResponseField>
+
+    <ResponseField name="setSigners" type="(connectedAccountId: AccountId) => void">
+      Internal method to initialize signers when a wallet connects.
+    </ResponseField>
+
+    <ResponseField name="clearSigners" type="() => void">
+      Internal method to clear signers when a wallet disconnects.
+    </ResponseField>
+
+    <ResponseField name="setConnectedAccountId" type="(connectedAccountId?: AccountId) => void">
+      Internal method to update the connected account ID.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Usage
+
+### Basic Example
+
+```tsx
+import {
+  createNearStore,
+  createMainnetClient,
+  createNearConnectorService,
+} from 'react-near-ts';
+
+const nearStore = createNearStore({
+  networkId: 'mainnet',
+  clientCreator: createMainnetClient,
+  serviceCreator: createNearConnectorService({ networkId: 'mainnet' }),
+});
+```
+
+### Custom RPC Endpoints
+
+```tsx
+import {
+  createNearStore,
+  createClient,
+  createNearConnectorService,
+} from 'react-near-ts';
+
+const clientCreator = () => createClient({
+  transport: {
+    rpcEndpoints: {
+      regular: [{ url: 'https://free.rpc.fastnear.com' }],
+      archival: [{ url: 'https://1rpc.io/near' }],
+    },
+  },
+});
+
+const nearStore = createNearStore({
+  networkId: 'mainnet',
+  clientCreator,
+  serviceCreator: createNearConnectorService({ networkId: 'mainnet' }),
+});
+```
+
+### Testnet Configuration
+
+```tsx
+import {
+  createNearStore,
+  createTestnetClient,
+  createNearConnectorService,
+} from 'react-near-ts';
+
+const nearStore = createNearStore({
+  networkId: 'testnet',
+  clientCreator: createTestnetClient,
+  serviceCreator: createNearConnectorService({ networkId: 'testnet' }),
+});
+```
+
+### Custom Store Name
+
+```tsx
+import {
+  createNearStore,
+  createMainnetClient,
+  createNearConnectorService,
+} from 'react-near-ts';
+
+const nearStore = createNearStore({
+  networkId: 'mainnet',
+  clientCreator: createMainnetClient,
+  serviceCreator: createNearConnectorService({ networkId: 'mainnet' }),
+  storeName: 'my-dapp',
+});
+// Persists to localStorage with key: 'my-dapp:mainnet'
+```
+
+### Using with NearProvider
+
+```tsx
+import {
+  NearProvider,
+  createNearStore,
+  createMainnetClient,
+  createNearConnectorService,
+} from 'react-near-ts';
+
+const nearStore = createNearStore({
+  networkId: 'mainnet',
+  clientCreator: createMainnetClient,
+  serviceCreator: createNearConnectorService({ networkId: 'mainnet' }),
+});
+
+export const App = ({ children }: { children: React.ReactNode }) => (
+  <NearProvider nearStore={nearStore}>{children}</NearProvider>
+);
+```
+
+## Persistence
+
+The store automatically persists the `connectedAccountId` to localStorage using the Zustand persist middleware. The persistence key format is `{storeName}:{networkId}`.
+
+When the store rehydrates from localStorage on page load, it automatically calls `setSigners()` if a connected account is found, restoring the full connection state.
+
+## Implementation Details
+
+The store creates and manages:
+
+1. **Services** - Instantiated from service creators (e.g., wallet connector)
+2. **Client** - NEAR API client for RPC calls
+3. **Signers** - Transaction signing instances, created when a wallet connects
+4. **Context** - Shared context containing all services, client, and signers
+
+The store state is reactive and can be subscribed to using Zustand's standard subscription methods.
+
+## Related
+
+- [createNearConnectorService](/api/store/create-near-connector-service) - Create the service creator for wallet connections
+- [NearProvider](/api/providers/near-provider) - React provider component that uses the store

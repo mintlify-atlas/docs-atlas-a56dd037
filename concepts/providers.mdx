@@ -1,0 +1,277 @@
+---
+title: "Providers"
+description: "Understand NEAR network providers and how to set up your React application"
+---
+
+## Overview
+
+Providers are the foundation of `react-near-ts`. They initialize the NEAR client, configure network settings, and manage the application state. All NEAR interactions in your application require wrapping your components with a provider.
+
+## Available Providers
+
+`react-near-ts` offers three provider options:
+
+<CardGroup cols={2}>
+  <Card title="MainnetNearProvider" icon="globe">
+    Pre-configured for NEAR mainnet
+  </Card>
+  <Card title="TestnetNearProvider" icon="flask">
+    Pre-configured for NEAR testnet
+  </Card>
+  <Card title="NearProvider" icon="gear">
+    Customizable provider for advanced configurations
+  </Card>
+</CardGroup>
+
+## MainnetNearProvider
+
+The simplest way to connect your application to NEAR mainnet.
+
+### Basic Usage
+
+```tsx
+import { MainnetNearProvider } from 'react-near-ts';
+
+function App() {
+  return (
+    <MainnetNearProvider>
+      <YourApp />
+    </MainnetNearProvider>
+  );
+}
+```
+
+### How It Works
+
+The `MainnetNearProvider` automatically:
+- Configures the network to `mainnet`
+- Creates a NEAR client using `createMainnetClient` from `near-api-ts`
+- Initializes the wallet connector service
+- Sets up state persistence
+
+<Accordion title="View source implementation">
+```tsx src/providers/MainnetNearProvider.tsx
+import { createNearStore } from '../store/nearStore.ts';
+import { createMainnetClient } from 'near-api-ts';
+import { createNearConnectorService } from '../services/nearConnector/nearConnector.ts';
+import { NearProvider } from './NearProvider.tsx';
+import type { ReactNode } from 'react';
+
+const createMainnetNearStore = () =>
+  createNearStore({
+    networkId: 'mainnet',
+    clientCreator: createMainnetClient,
+    serviceCreator: createNearConnectorService({ networkId: 'mainnet' }),
+  });
+
+export const MainnetNearProvider = (props: { children: ReactNode }) => (
+  <NearProvider nearStore={createMainnetNearStore()}>{props.children}</NearProvider>
+);
+```
+</Accordion>
+
+## TestnetNearProvider
+
+Perfect for development and testing environments.
+
+### Basic Usage
+
+```tsx
+import { TestnetNearProvider } from 'react-near-ts';
+
+function App() {
+  return (
+    <TestnetNearProvider>
+      <YourApp />
+    </TestnetNearProvider>
+  );
+}
+```
+
+### How It Works
+
+Identical to `MainnetNearProvider` but configured for testnet:
+- Network ID set to `testnet`
+- Uses `createTestnetClient` from `near-api-ts`
+- Connects to testnet RPC endpoints
+
+<Accordion title="View source implementation">
+```tsx src/providers/TestnetNearProvider.tsx
+import { createNearStore } from '../store/nearStore.ts';
+import { createTestnetClient } from 'near-api-ts';
+import { createNearConnectorService } from '../services/nearConnector/nearConnector.ts';
+import { NearProvider } from './NearProvider.tsx';
+import type { ReactNode } from 'react';
+
+const createTestnetNearStore = () =>
+  createNearStore({
+    networkId: 'testnet',
+    clientCreator: createTestnetClient,
+    serviceCreator: createNearConnectorService({ networkId: 'testnet' }),
+  });
+
+export const TestnetNearProvider = (props: { children: ReactNode }) => (
+  <NearProvider nearStore={createTestnetNearStore()}>{props.children}</NearProvider>
+);
+```
+</Accordion>
+
+## NearProvider
+
+The base provider that powers both `MainnetNearProvider` and `TestnetNearProvider`. Use this for custom configurations.
+
+### Advanced Usage
+
+```tsx
+import { NearProvider, createNearStore } from 'react-near-ts';
+import { createCustomClient } from 'near-api-ts';
+
+const customStore = createNearStore({
+  networkId: 'mainnet',
+  clientCreator: createCustomClient,
+  serviceCreator: createNearConnectorService({ networkId: 'mainnet' }),
+  storeName: 'my-custom-app', // Optional: custom storage key
+});
+
+function App() {
+  return (
+    <NearProvider nearStore={customStore}>
+      <YourApp />
+    </NearProvider>
+  );
+}
+```
+
+### Architecture
+
+The `NearProvider` sets up two critical layers:
+
+1. **State Management**: Uses Zustand to manage NEAR state
+2. **Query Client**: Integrates TanStack Query for data fetching
+
+<Accordion title="View source implementation">
+```tsx src/providers/NearProvider.tsx
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { NearStoreProvider } from '../store/NearStoreProvider.tsx';
+import type { ReactNode } from 'react';
+import type { NearStore } from '../../types/store.ts';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: false },
+    mutations: { retry: false },
+  },
+});
+
+type NearProviderProps = {
+  nearStore: NearStore;
+  children: ReactNode;
+};
+
+export const NearProvider = (props: NearProviderProps) => (
+  <NearStoreProvider nearStore={props.nearStore}>
+    <QueryClientProvider client={queryClient}>
+      {props.children}
+    </QueryClientProvider>
+  </NearStoreProvider>
+);
+```
+</Accordion>
+
+## Store Configuration
+
+All providers use the `createNearStore` function to initialize application state.
+
+### Store Parameters
+
+<ParamField path="networkId" type="string" required>
+  Network identifier (`mainnet` or `testnet`)
+</ParamField>
+
+<ParamField path="clientCreator" type="() => Client" required>
+  Function that creates and returns a NEAR client instance
+</ParamField>
+
+<ParamField path="serviceCreator" type="ServiceCreator" required>
+  Service creator for wallet connection (typically `createNearConnectorService`)
+</ParamField>
+
+<ParamField path="storeName" type="string">
+  Custom name for local storage persistence (default: `react-near-ts`)
+</ParamField>
+
+### State Persistence
+
+The store automatically persists the connected account ID to localStorage:
+
+```tsx
+{
+  name: `${storeName}:${networkId}`,
+  version: 1,
+  partialize: (s) => ({ connectedAccountId: s.connectedAccountId }),
+  onRehydrateStorage: () => (state) => {
+    if (state?.connectedAccountId) state.setSigners(state.connectedAccountId);
+  },
+}
+```
+
+<Info>
+  When the app reloads, if a user was previously connected, the store automatically restores their session and recreates signers.
+</Info>
+
+## Choosing a Provider
+
+<Steps>
+  <Step title="For most applications">
+    Use `MainnetNearProvider` (production) or `TestnetNearProvider` (development)
+  </Step>
+  
+  <Step title="For custom RPC endpoints">
+    Use `NearProvider` with a custom client creator
+  </Step>
+  
+  <Step title="For multi-network support">
+    Create multiple stores and switch between providers based on user selection
+  </Step>
+</Steps>
+
+## Best Practices
+
+<Warning>
+  Always place the provider at the **root** of your application, wrapping all components that need NEAR access.
+</Warning>
+
+<Check>
+  **Good**: One provider at the app root
+  ```tsx
+  <MainnetNearProvider>
+    <Router>
+      <App />
+    </Router>
+  </MainnetNearProvider>
+  ```
+</Check>
+
+<Warning>
+  **Bad**: Multiple providers or nested providers
+  ```tsx
+  <MainnetNearProvider>
+    <ComponentA />
+    <MainnetNearProvider> {/* ❌ Nested provider */}
+      <ComponentB />
+    </MainnetNearProvider>
+  </MainnetNearProvider>
+  ```
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Network Configuration" icon="network-wired" href="/concepts/network-configuration">
+    Learn how to configure custom RPC endpoints
+  </Card>
+  
+  <Card title="Wallet Connection" icon="wallet" href="/concepts/wallet-connection">
+    Understand the wallet connection flow
+  </Card>
+</CardGroup>

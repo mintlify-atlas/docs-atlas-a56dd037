@@ -1,0 +1,329 @@
+---
+title: useAccountInfo
+description: Hook for fetching NEAR account information including balance and storage
+---
+
+## Overview
+
+`useAccountInfo` fetches detailed information about a NEAR account, including balance (total, available, locked), storage usage, and account state. It uses TanStack Query for caching and automatic refetching.
+
+## Import
+
+```typescript
+import { useAccountInfo } from 'react-near-ts';
+```
+
+## Type Signature
+
+```typescript
+type UseAccountInfo = (
+  args: UseAccountInfoArgs,
+) => UseQueryResult<GetAccountInfoOutput, GetAccountInfoError>;
+
+type UseAccountInfoArgs = {
+  accountId?: AccountId;
+  atMomentOf?: BlockReference;
+  policies?: {
+    transport?: PartialTransportPolicy;
+  };
+  query?: {
+    enabled?: boolean;
+  };
+};
+```
+
+Source: [types/hooks/useAccountInfo.ts:21](https://github.com/hot-labs/react-near-ts/blob/main/types/hooks/useAccountInfo.ts#L21)
+
+## Parameters
+
+<ParamField path="accountId" type="AccountId" required>
+  The NEAR account ID to fetch information for.
+  
+  Example: `"user.testnet"` or `"alice.near"`
+  
+  **Note:** Query will not execute if `accountId` is `undefined`.
+</ParamField>
+
+<ParamField path="atMomentOf" type="BlockReference">
+  Block reference to query account state at a specific point in time.
+  
+  Options:
+  - `"LatestOptimisticBlock"` - Most recent block (default)
+  - `"LatestFinalBlock"` - Latest finalized block
+  - `{ blockHash: string }` - Specific block by hash
+  - `{ blockHeight: number }` - Specific block by height
+</ParamField>
+
+<ParamField path="policies" type="object">
+  Transport and retry policies for the RPC request.
+  
+  <Expandable title="properties">
+    <ParamField path="policies.transport" type="PartialTransportPolicy">
+      Custom transport configuration including retry logic and timeouts.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="query" type="object">
+  TanStack Query options.
+  
+  <Expandable title="properties">
+    <ParamField path="query.enabled" type="boolean" default="true">
+      Whether the query should execute automatically. Set to `false` to disable the query.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Return Value
+
+<ResponseField name="data" type="GetAccountInfoOutput">
+  The account information data when the query succeeds.
+  
+  <Expandable title="properties">
+    <ResponseField name="accountId" type="string">
+      The account ID that was queried.
+    </ResponseField>
+    
+    <ResponseField name="accountInfo" type="object">
+      Detailed account information.
+      
+      <Expandable title="properties">
+        <ResponseField name="balance" type="object">
+          Account balance information.
+          
+          <Expandable title="properties">
+            <ResponseField name="total" type="{ near: string, yoctoNear: string }">
+              Total account balance in NEAR and yoctoNEAR.
+            </ResponseField>
+            
+            <ResponseField name="available" type="{ near: string, yoctoNear: string }">
+              Available balance (total minus locked and storage staking).
+            </ResponseField>
+            
+            <ResponseField name="locked" type="object">
+              Locked balance information.
+              
+              <Expandable title="properties">
+                <ResponseField name="amount" type="{ near: string, yoctoNear: string }">
+                  Amount of locked tokens.
+                </ResponseField>
+              </Expandable>
+            </ResponseField>
+          </Expandable>
+        </ResponseField>
+        
+        <ResponseField name="usedStorageBytes" type="number">
+          Storage used by the account in bytes.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="isPending" type="boolean">
+  `true` while the query is loading.
+</ResponseField>
+
+<ResponseField name="isError" type="boolean">
+  `true` if the query failed.
+</ResponseField>
+
+<ResponseField name="error" type="GetAccountInfoError | null">
+  Error object if the query failed.
+</ResponseField>
+
+<ResponseField name="isSuccess" type="boolean">
+  `true` if the query completed successfully.
+</ResponseField>
+
+<ResponseField name="refetch" type="() => Promise<UseQueryResult>">
+  Function to manually refetch the account information.
+</ResponseField>
+
+## Usage
+
+### Basic Usage
+
+```typescript
+import { useAccountInfo } from 'react-near-ts';
+
+function AccountBalance({ accountId }) {
+  const accountInfo = useAccountInfo({ accountId });
+
+  if (accountInfo.isPending) {
+    return <p>Loading...</p>;
+  }
+
+  if (accountInfo.isError) {
+    return <p>Error: {accountInfo.error.message}</p>;
+  }
+
+  const { balance } = accountInfo.data.accountInfo;
+
+  return (
+    <div>
+      <h3>Account: {accountInfo.data.accountId}</h3>
+      <p>Total Balance: {balance.total.near} NEAR</p>
+      <p>Available: {balance.available.near} NEAR</p>
+      <p>Locked: {balance.locked.amount.near} NEAR</p>
+    </div>
+  );
+}
+```
+
+### With Connected Account
+
+```typescript
+import { useConnectedAccount, useAccountInfo } from 'react-near-ts';
+
+function MyAccountInfo() {
+  const { connectedAccountId, isConnectedAccount } = useConnectedAccount();
+  const accountInfo = useAccountInfo({ accountId: connectedAccountId });
+
+  if (!isConnectedAccount) {
+    return <p>Connect your wallet to see account info.</p>;
+  }
+
+  if (accountInfo.isPending) {
+    return <p>Loading account details...</p>;
+  }
+
+  if (accountInfo.isError) {
+    return <p>Failed to load account info.</p>;
+  }
+
+  const { balance, usedStorageBytes } = accountInfo.data.accountInfo;
+
+  return (
+    <div>
+      <h2>Account Info</h2>
+      <p>Account ID: {accountInfo.data.accountId}</p>
+      <p>Storage Used: {usedStorageBytes} bytes</p>
+      <p>Total Balance: {balance.total.near} NEAR</p>
+      <p>Available Balance: {balance.available.near} NEAR</p>
+      <p>Locked Balance: {balance.locked.amount.near} NEAR</p>
+    </div>
+  );
+}
+```
+
+### Query at Specific Block
+
+```typescript
+import { useAccountInfo } from 'react-near-ts';
+
+function HistoricalBalance({ accountId, blockHeight }) {
+  const accountInfo = useAccountInfo({
+    accountId,
+    atMomentOf: { blockHeight },
+  });
+
+  if (accountInfo.isPending) return <p>Loading...</p>;
+  if (accountInfo.isError) return <p>Error loading data</p>;
+
+  return (
+    <div>
+      <p>Balance at block {blockHeight}:</p>
+      <p>{accountInfo.data.accountInfo.balance.total.near} NEAR</p>
+    </div>
+  );
+}
+```
+
+### Conditional Querying
+
+```typescript
+import { useAccountInfo } from 'react-near-ts';
+import { useState } from 'react';
+
+function LookupAccount() {
+  const [accountId, setAccountId] = useState('');
+  const [shouldFetch, setShouldFetch] = useState(false);
+
+  const accountInfo = useAccountInfo({
+    accountId,
+    query: {
+      enabled: shouldFetch && accountId.length > 0,
+    },
+  });
+
+  return (
+    <div>
+      <input
+        value={accountId}
+        onChange={(e) => setAccountId(e.target.value)}
+        placeholder="Enter account ID"
+      />
+      <button onClick={() => setShouldFetch(true)}>
+        Look Up
+      </button>
+
+      {accountInfo.isPending && <p>Loading...</p>}
+      {accountInfo.isError && <p>Account not found</p>}
+      {accountInfo.isSuccess && (
+        <p>Balance: {accountInfo.data.accountInfo.balance.total.near} NEAR</p>
+      )}
+    </div>
+  );
+}
+```
+
+### Manual Refetch
+
+```typescript
+import { useAccountInfo } from 'react-near-ts';
+
+function RefreshableBalance({ accountId }) {
+  const accountInfo = useAccountInfo({ accountId });
+
+  return (
+    <div>
+      {accountInfo.isSuccess && (
+        <>
+          <p>Balance: {accountInfo.data.accountInfo.balance.total.near} NEAR</p>
+          <button onClick={() => accountInfo.refetch()}>
+            Refresh
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+```
+
+## Caching Behavior
+
+- **Query Key:** `['getAccountInfo', accountId]`
+- Automatically caches results per account ID
+- Shares cached data across components querying the same account
+- Automatically refetches on window focus by default (TanStack Query default behavior)
+
+## Error Handling
+
+The query can fail for several reasons:
+
+- Account does not exist
+- Network/RPC errors
+- Invalid account ID format
+- Block reference not found (when using `atMomentOf`)
+
+```typescript
+if (accountInfo.isError) {
+  // Handle different error types
+  console.error('Account info error:', accountInfo.error);
+}
+```
+
+## Related Hooks
+
+- [useConnectedAccount](/api/hooks/use-connected-account) - Get the currently connected account ID
+- [useContractReadFunction](/api/hooks/use-contract-read-function) - Read from smart contracts
+
+## Type Definitions
+
+Source: [types/hooks/useAccountInfo.ts](https://github.com/hot-labs/react-near-ts/blob/main/types/hooks/useAccountInfo.ts)
+
+## Examples from Playground
+
+See real-world implementation:
+- [Account Info Page](https://github.com/hot-labs/react-near-ts/blob/main/playgrounds/next-app-router/src/app/account-info/page.tsx#L17)

@@ -1,0 +1,519 @@
+---
+title: "Wallet Connection"
+description: "Connect and manage NEAR wallets using the useNearConnector hook"
+---
+
+## Overview
+
+Wallet connection is the gateway to blockchain interactions in `react-near-ts`. The library integrates with `@hot-labs/near-connect` to provide a seamless wallet connection experience through the `useNearConnector` hook.
+
+## Quick Start
+
+```tsx
+import { useNearConnector, useConnectedAccount } from 'react-near-ts';
+
+function WalletButton() {
+  const { connect, disconnect } = useNearConnector();
+  const { connectedAccountId, isConnectedAccount } = useConnectedAccount();
+
+  if (isConnectedAccount) {
+    return (
+      <div>
+        <p>Connected: {connectedAccountId}</p>
+        <button onClick={() => disconnect.mutate()}>
+          Disconnect
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button onClick={() => connect.mutate()}>
+      Connect Wallet
+    </button>
+  );
+}
+```
+
+## The useNearConnector Hook
+
+The `useNearConnector` hook provides two mutation functions for managing wallet connections.
+
+### Return Value
+
+```tsx
+const { connect, disconnect } = useNearConnector();
+```
+
+<ResponseField name="connect" type="UseMutationResult">
+  Mutation to initiate wallet connection
+  
+  <Expandable title="properties">
+    <ResponseField name="mutate" type="() => void">
+      Trigger the connection flow
+    </ResponseField>
+    <ResponseField name="mutateAsync" type="() => Promise<void>">
+      Async version that returns a promise
+    </ResponseField>
+    <ResponseField name="isPending" type="boolean">
+      True while connection is in progress
+    </ResponseField>
+    <ResponseField name="isError" type="boolean">
+      True if connection failed
+    </ResponseField>
+    <ResponseField name="error" type="Error | null">
+      Error object if connection failed
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="disconnect" type="UseMutationResult">
+  Mutation to disconnect the wallet
+  
+  <Expandable title="properties">
+    <ResponseField name="mutate" type="() => void">
+      Trigger the disconnection
+    </ResponseField>
+    <ResponseField name="mutateAsync" type="() => Promise<void>">
+      Async version that returns a promise
+    </ResponseField>
+    <ResponseField name="isPending" type="boolean">
+      True while disconnection is in progress
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Connection Flow
+
+Under the hood, the connection process follows these steps:
+
+<Steps>
+  <Step title="User initiates connection">
+    User clicks a button that calls `connect.mutate()`
+  </Step>
+  
+  <Step title="Wallet selector opens">
+    `@hot-labs/near-connect` displays wallet options (MyNearWallet, Meteor, etc.)
+  </Step>
+  
+  <Step title="User selects wallet">
+    User chooses their preferred wallet and authorizes the connection
+  </Step>
+  
+  <Step title="Account retrieved">
+    The connected wallet returns the user's account information
+  </Step>
+  
+  <Step title="Signers created">
+    Transaction signers are initialized for the connected account
+  </Step>
+  
+  <Step title="State updated">
+    Connected account ID is stored in state and persisted to localStorage
+  </Step>
+</Steps>
+
+<Accordion title="View connection implementation">
+```tsx src/hooks/useNearConnector.ts
+import { NearConnector } from '@hot-labs/near-connect';
+import { useNearStore } from '../store/NearStoreProvider.tsx';
+import { useMutation } from '@tanstack/react-query';
+
+export const useNearConnector = () => {
+  const getContext = useNearStore((store) => store.getContext);
+  const setSigners = useNearStore((store) => store.setSigners);
+  const clearSigners = useNearStore((store) => store.clearSigners);
+  const setConnectedAccountId = useNearStore((store) => store.setConnectedAccountId);
+  const context = getContext();
+
+  const connect = useMutation<void, Error, void, unknown>({
+    mutationFn: async () => {
+      const connector = context.services.nearConnector.serviceBox.connector;
+
+      // Open wallet selector and get wallet instance
+      const wallet = await connector.connect();
+      
+      // Retrieve connected accounts
+      const accounts = await wallet.getAccounts();
+      const connectedAccountId = accounts[0].accountId;
+
+      // Initialize signers and update state
+      setSigners(connectedAccountId);
+      setConnectedAccountId(connectedAccountId);
+    },
+  });
+
+  const disconnect = useMutation<void, Error, void, unknown>({
+    mutationFn: async () => {
+      const connector = context.services.nearConnector.serviceBox.connector;
+
+      // Disconnect from wallet
+      await connector.disconnect();
+      
+      // Clear signers and state
+      clearSigners();
+      setConnectedAccountId(undefined);
+    },
+  });
+
+  return { connect, disconnect };
+};
+```
+</Accordion>
+
+## Checking Connection Status
+
+Use the `useConnectedAccount` hook to check if a wallet is connected:
+
+```tsx
+import { useConnectedAccount } from 'react-near-ts';
+
+function MyComponent() {
+  const { connectedAccountId, isConnectedAccount } = useConnectedAccount();
+
+  if (!isConnectedAccount) {
+    return <p>Please connect your wallet</p>;
+  }
+
+  return <p>Welcome, {connectedAccountId}!</p>;
+}
+```
+
+### Return Value
+
+<ResponseField name="connectedAccountId" type="string | undefined">
+  The account ID of the connected wallet, or `undefined` if not connected
+</ResponseField>
+
+<ResponseField name="isConnectedAccount" type="boolean">
+  `true` if a wallet is connected, `false` otherwise
+</ResponseField>
+
+<Accordion title="View useConnectedAccount implementation">
+```tsx src/hooks/useConnectedAccount.ts
+import { useNearStore } from '../store/NearStoreProvider.tsx';
+
+export const useConnectedAccount = () => {
+  const connectedAccountId = useNearStore((store) => store.connectedAccountId);
+  
+  return {
+    connectedAccountId,
+    isConnectedAccount: typeof connectedAccountId === 'string',
+  };
+};
+```
+</Accordion>
+
+## Advanced Usage
+
+### Loading States
+
+Show loading indicators during connection/disconnection:
+
+```tsx
+function WalletButton() {
+  const { connect, disconnect } = useNearConnector();
+  const { isConnectedAccount } = useConnectedAccount();
+
+  if (connect.isPending) {
+    return <button disabled>Connecting...</button>;
+  }
+
+  if (disconnect.isPending) {
+    return <button disabled>Disconnecting...</button>;
+  }
+
+  if (isConnectedAccount) {
+    return (
+      <button onClick={() => disconnect.mutate()}>
+        Disconnect
+      </button>
+    );
+  }
+
+  return (
+    <button onClick={() => connect.mutate()}>
+      Connect Wallet
+    </button>
+  );
+}
+```
+
+### Error Handling
+
+Handle connection errors gracefully:
+
+```tsx
+function WalletButton() {
+  const { connect } = useNearConnector();
+
+  return (
+    <div>
+      <button onClick={() => connect.mutate()}>
+        Connect Wallet
+      </button>
+      
+      {connect.isError && (
+        <div className="error">
+          Failed to connect: {connect.error?.message}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+### Async Connection
+
+Use `mutateAsync` for promise-based flows:
+
+```tsx
+function WalletButton() {
+  const { connect } = useNearConnector();
+
+  const handleConnect = async () => {
+    try {
+      await connect.mutateAsync();
+      console.log('Connected successfully!');
+      // Navigate to dashboard or trigger other actions
+    } catch (error) {
+      console.error('Connection failed:', error);
+    }
+  };
+
+  return (
+    <button onClick={handleConnect}>
+      Connect Wallet
+    </button>
+  );
+}
+```
+
+## Persistent Sessions
+
+The library automatically persists wallet connections across page refreshes.
+
+### How It Works
+
+1. When a user connects, their account ID is saved to localStorage
+2. On page load, the store checks localStorage for a saved account
+3. If found, signers are automatically recreated
+4. The user remains connected without needing to reconnect
+
+<Info>
+  The storage key format is: `${storeName}:${networkId}`
+  
+  Example: `react-near-ts:mainnet`
+</Info>
+
+### Clearing Persisted Sessions
+
+To manually clear a persisted session:
+
+```tsx
+// Clear for specific network
+localStorage.removeItem('react-near-ts:mainnet');
+
+// Or disconnect programmatically
+const { disconnect } = useNearConnector();
+disconnect.mutate();
+```
+
+## Integration with @hot-labs/near-connect
+
+The `NearConnector` from `@hot-labs/near-connect` is initialized when you create a store:
+
+```tsx src/services/nearConnector/nearConnector.ts
+import { NearConnector } from '@hot-labs/near-connect';
+
+export const createNearConnectorService = (args) => ({
+  serviceId: 'nearConnector',
+
+  createService: () => {
+    const connector = new NearConnector({ network: args.networkId });
+    return {
+      serviceId: 'nearConnector',
+      serviceBox: { connector },
+    };
+  },
+
+  createSigner: (args) => {
+    return {
+      serviceId: 'nearConnector',
+      safeExecuteTransaction: createSafeExecuteTransaction(args.serviceBox.connector),
+    };
+  },
+});
+```
+
+The connector:
+- Manages wallet selector UI
+- Handles wallet-specific authentication
+- Provides the wallet instance for signing transactions
+
+## Transaction Signing
+
+Once connected, transactions are signed using the wallet:
+
+```tsx src/services/nearConnector/executeTransaction/executeTransaction.ts
+export const createSafeExecuteTransaction = (connector) => async (args) => {
+  try {
+    // Get the connected wallet instance
+    const wallet = await connector.wallet();
+
+    // Sign and send the transaction
+    const finalExecutionOutcome = await wallet.signAndSendTransaction({
+      actions: toNearConnectActions(args.intent),
+      receiverId: args.intent.receiverAccountId,
+    });
+
+    return result.ok({ rawRpcResult: finalExecutionOutcome });
+  } catch (e) {
+    return result.err(e);
+  }
+};
+```
+
+<Note>
+  Transaction execution is covered in detail in the [useExecuteTransaction](/api/hooks/use-execute-transaction) documentation.
+</Note>
+
+## Best Practices
+
+<Check>
+  **Do**: Check connection status before allowing users to interact with blockchain features
+</Check>
+
+<Check>
+  **Do**: Show loading states during connection/disconnection
+</Check>
+
+<Check>
+  **Do**: Handle connection errors with user-friendly messages
+</Check>
+
+<Warning>
+  **Don't**: Assume a wallet is connected without checking `isConnectedAccount`
+</Warning>
+
+<Warning>
+  **Don't**: Call `connect.mutate()` repeatedly without checking if already connected
+</Warning>
+
+## Common Patterns
+
+### Protected Route
+
+Require wallet connection for certain routes:
+
+```tsx
+import { useConnectedAccount } from 'react-near-ts';
+import { Navigate } from 'react-router-dom';
+
+function ProtectedRoute({ children }) {
+  const { isConnectedAccount } = useConnectedAccount();
+
+  if (!isConnectedAccount) {
+    return <Navigate to="/connect" replace />;
+  }
+
+  return children;
+}
+```
+
+### Account Dropdown
+
+Display connected account with disconnect option:
+
+```tsx
+function AccountDropdown() {
+  const { connectedAccountId } = useConnectedAccount();
+  const { disconnect } = useNearConnector();
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="dropdown">
+      <button onClick={() => setIsOpen(!isOpen)}>
+        {connectedAccountId}
+      </button>
+      
+      {isOpen && (
+        <div className="menu">
+          <button onClick={() => disconnect.mutate()}>
+            Disconnect
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+### Reconnect on Error
+
+Automatically prompt reconnection if session is lost:
+
+```tsx
+import { useEffect } from 'react';
+import { useConnectedAccount, useNearConnector } from 'react-near-ts';
+
+function App() {
+  const { isConnectedAccount } = useConnectedAccount();
+  const { connect } = useNearConnector();
+
+  useEffect(() => {
+    // Check if user was previously connected but session was lost
+    const wasConnected = localStorage.getItem('was-connected');
+    
+    if (wasConnected && !isConnectedAccount) {
+      // Prompt user to reconnect
+      if (confirm('Your session expired. Reconnect?')) {
+        connect.mutate();
+      }
+    }
+  }, [isConnectedAccount]);
+
+  // ... rest of app
+}
+```
+
+## Troubleshooting
+
+### Wallet Not Opening
+
+**Symptoms**: Clicking connect does nothing
+
+**Solutions**:
+- Check browser console for errors
+- Ensure popup blockers are disabled
+- Verify the provider is wrapping your component
+
+### Connection State Not Persisting
+
+**Symptoms**: User is disconnected on page refresh
+
+**Solutions**:
+- Check that localStorage is enabled
+- Verify the store name matches across sessions
+- Check browser privacy settings (some modes block localStorage)
+
+### Account ID Undefined
+
+**Symptoms**: `connectedAccountId` is `undefined` despite being connected
+
+**Solutions**:
+- Wait for connection to complete (check `connect.isPending`)
+- Ensure you're using the hook inside the provider
+- Check for race conditions in your code
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Execute Transactions" icon="paper-plane" href="/hooks/use-execute-transaction">
+    Learn how to send transactions using the connected wallet
+  </Card>
+  
+  <Card title="Account Info" icon="user" href="/hooks/use-account-info">
+    Fetch account balance and other details
+  </Card>
+</CardGroup>

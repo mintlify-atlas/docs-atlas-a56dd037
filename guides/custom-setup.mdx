@@ -1,0 +1,267 @@
+---
+title: Custom Setup
+description: Configure react-near-ts with custom RPC endpoints, network settings, and advanced options
+---
+
+For advanced use cases, you can create a custom NEAR store with specific configuration options.
+
+## Why Custom Setup?
+
+Use custom setup when you need to:
+
+- Use custom RPC endpoints
+- Configure multiple RPC providers for redundancy
+- Customize network settings
+- Add custom middleware or services
+- Configure storage persistence options
+
+## Basic Custom Setup
+
+Create a custom NEAR provider with specific RPC endpoints:
+
+```tsx
+import {
+  NearProvider,
+  createNearStore,
+  createClient,
+  createNearConnectorService,
+} from 'react-near-ts';
+
+const clientCreator = () => createClient({
+  transport: {
+    rpcEndpoints: {
+      regular: [{ url: 'https://free.rpc.fastnear.com' }],
+      archival: [{ url: 'https://1rpc.io/near' }],
+    },
+  },
+});
+
+const nearStore = createNearStore({
+  networkId: 'mainnet',
+  clientCreator,
+  serviceCreator: createNearConnectorService({ networkId: 'mainnet' }),
+});
+
+export function App({ children }: { children: React.ReactNode }) {
+  return (
+    <NearProvider nearStore={nearStore}>
+      {children}
+    </NearProvider>
+  );
+}
+```
+
+## Custom RPC Endpoints
+
+### Single Endpoint
+
+```tsx
+const clientCreator = () => createClient({
+  transport: {
+    rpcEndpoints: {
+      regular: [{ url: 'https://your-custom-rpc.com' }],
+    },
+  },
+});
+```
+
+### Multiple Endpoints for Redundancy
+
+Configure multiple RPC endpoints for automatic failover:
+
+```tsx
+const clientCreator = () => createClient({
+  transport: {
+    rpcEndpoints: {
+      regular: [
+        { url: 'https://rpc.mainnet.near.org' },
+        { url: 'https://free.rpc.fastnear.com' },
+        { url: 'https://1rpc.io/near' },
+      ],
+      archival: [
+        { url: 'https://archival-rpc.mainnet.near.org' },
+        { url: 'https://near-mainnet.api.pagoda.co/rpc/v1' },
+      ],
+    },
+  },
+});
+```
+
+<Note>
+  The client will automatically try the next endpoint if one fails, providing built-in redundancy.
+</Note>
+
+## Testnet Configuration
+
+Set up a custom testnet configuration:
+
+```tsx
+import {
+  NearProvider,
+  createNearStore,
+  createClient,
+  createNearConnectorService,
+} from 'react-near-ts';
+
+const clientCreator = () => createClient({
+  transport: {
+    rpcEndpoints: {
+      regular: [{ url: 'https://rpc.testnet.near.org' }],
+      archival: [{ url: 'https://archival-rpc.testnet.near.org' }],
+    },
+  },
+});
+
+const nearStore = createNearStore({
+  networkId: 'testnet',
+  clientCreator,
+  serviceCreator: createNearConnectorService({ networkId: 'testnet' }),
+});
+
+export function App({ children }: { children: React.ReactNode }) {
+  return (
+    <NearProvider nearStore={nearStore}>
+      {children}
+    </NearProvider>
+  );
+}
+```
+
+## Store Configuration Options
+
+The `createNearStore` function accepts the following configuration:
+
+```typescript
+const nearStore = createNearStore({
+  // Required: Network ID ('mainnet' or 'testnet')
+  networkId: 'mainnet',
+  
+  // Required: Function that creates the NEAR client
+  clientCreator: () => createClient({ /* ... */ }),
+  
+  // Required: Service creator for wallet connection
+  serviceCreator: createNearConnectorService({ networkId: 'mainnet' }),
+  
+  // Optional: Custom store name for localStorage
+  storeName: 'my-dapp', // Default: 'react-near-ts'
+});
+```
+
+## Using Built-in Providers
+
+For most cases, the built-in providers are sufficient:
+
+<CodeGroup>
+
+```tsx Mainnet
+import { MainnetNearProvider } from 'react-near-ts';
+
+export function App({ children }: { children: React.ReactNode }) {
+  return (
+    <MainnetNearProvider>
+      {children}
+    </MainnetNearProvider>
+  );
+}
+```
+
+```tsx Testnet
+import { TestnetNearProvider } from 'react-near-ts';
+
+export function App({ children }: { children: React.ReactNode }) {
+  return (
+    <TestnetNearProvider>
+      {children}
+    </TestnetNearProvider>
+  );
+}
+```
+
+</CodeGroup>
+
+## Next.js App Router Example
+
+Complete example for Next.js 13+ with App Router:
+
+```tsx app/layout.tsx
+import React from 'react';
+import { TestnetNearProvider } from 'react-near-ts';
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <TestnetNearProvider>
+          {children}
+        </TestnetNearProvider>
+      </body>
+    </html>
+  );
+}
+```
+
+<Tip>
+  Always wrap your app at the highest level possible to ensure all components have access to the NEAR context.
+</Tip>
+
+## Advanced: Custom Client Configuration
+
+You can pass additional configuration to the NEAR client:
+
+```tsx
+import { createClient } from 'react-near-ts';
+
+const clientCreator = () => createClient({
+  transport: {
+    rpcEndpoints: {
+      regular: [{ url: 'https://free.rpc.fastnear.com' }],
+      archival: [{ url: 'https://1rpc.io/near' }],
+    },
+    // Additional transport configuration
+    // (refer to near-api-ts documentation for all options)
+  },
+});
+```
+
+## Environment-Based Configuration
+
+Configure different endpoints based on environment:
+
+```tsx
+const clientCreator = () => createClient({
+  transport: {
+    rpcEndpoints: {
+      regular: [
+        { 
+          url: process.env.NEXT_PUBLIC_NEAR_RPC_URL || 
+               'https://rpc.mainnet.near.org' 
+        }
+      ],
+    },
+  },
+});
+
+const nearStore = createNearStore({
+  networkId: (process.env.NEXT_PUBLIC_NEAR_NETWORK || 'mainnet') as 'mainnet' | 'testnet',
+  clientCreator,
+  serviceCreator: createNearConnectorService({ 
+    networkId: (process.env.NEXT_PUBLIC_NEAR_NETWORK || 'mainnet') as 'mainnet' | 'testnet'
+  }),
+});
+```
+
+## State Persistence
+
+The store automatically persists the connected account to localStorage:
+
+- Storage key format: `{storeName}:{networkId}`
+- Default: `react-near-ts:mainnet` or `react-near-ts:testnet`
+- Custom: `my-dapp:mainnet` (if you set `storeName: 'my-dapp'`)
+
+<Note>
+  The connected account state is automatically restored when the user returns to your app.
+</Note>

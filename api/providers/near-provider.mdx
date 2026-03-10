@@ -1,0 +1,162 @@
+---
+title: NearProvider
+description: Low-level provider for custom NEAR configurations
+---
+
+`NearProvider` is the core provider component that sets up the NEAR context for your application. It accepts a custom NEAR store, allowing full control over network configuration, RPC endpoints, and services.
+
+## Component Signature
+
+```tsx
+type NearProviderProps = {
+  nearStore: NearStore;
+  children: ReactNode;
+};
+
+const NearProvider: (props: NearProviderProps) => JSX.Element
+```
+
+## Props
+
+<ParamField path="nearStore" type="NearStore" required>
+  A NEAR store instance created with `createNearStore`. This store contains the network configuration, client, and services.
+</ParamField>
+
+<ParamField path="children" type="ReactNode" required>
+  The child components that will have access to the NEAR context.
+</ParamField>
+
+## Usage
+
+### Custom RPC Endpoints
+
+Use `NearProvider` when you need custom RPC endpoints:
+
+```tsx
+import {
+  NearProvider,
+  createNearStore,
+  createClient,
+  createNearConnectorService,
+} from 'react-near-ts';
+
+const clientCreator = () => createClient({
+  transport: {
+    rpcEndpoints: {
+      regular: [{ url: 'https://free.rpc.fastnear.com' }],
+      archival: [{ url: 'https://1rpc.io/near' }],
+    },
+  },
+});
+
+const nearStore = createNearStore({
+  networkId: 'mainnet',
+  clientCreator,
+  serviceCreator: createNearConnectorService({ networkId: 'mainnet' }),
+});
+
+export const App = ({ children }: { children: React.ReactNode }) => (
+  <NearProvider nearStore={nearStore}>{children}</NearProvider>
+);
+```
+
+### Multiple Network Support
+
+Dynamically switch between networks:
+
+```tsx
+import { NearProvider, createNearStore } from 'react-near-ts';
+import { createMainnetClient, createTestnetClient } from 'near-api-ts';
+import { createNearConnectorService } from 'react-near-ts';
+import { useState } from 'react';
+
+function App({ children }: { children: React.ReactNode }) {
+  const [network, setNetwork] = useState<'mainnet' | 'testnet'>('mainnet');
+
+  const nearStore = createNearStore({
+    networkId: network,
+    clientCreator: network === 'mainnet' ? createMainnetClient : createTestnetClient,
+    serviceCreator: createNearConnectorService({ networkId: network }),
+  });
+
+  return (
+    <div>
+      <select value={network} onChange={(e) => setNetwork(e.target.value as any)}>
+        <option value="mainnet">Mainnet</option>
+        <option value="testnet">Testnet</option>
+      </select>
+      <NearProvider nearStore={nearStore}>{children}</NearProvider>
+    </div>
+  );
+}
+```
+
+### Custom Network ID
+
+Connect to custom NEAR networks or local nodes:
+
+```tsx
+import {
+  NearProvider,
+  createNearStore,
+  createClient,
+  createNearConnectorService,
+} from 'react-near-ts';
+
+const clientCreator = () => createClient({
+  transport: {
+    rpcEndpoints: {
+      regular: [{ url: 'http://localhost:3030' }],
+      archival: [{ url: 'http://localhost:3030' }],
+    },
+  },
+});
+
+const nearStore = createNearStore({
+  networkId: 'localnet',
+  clientCreator,
+  serviceCreator: createNearConnectorService({ networkId: 'localnet' }),
+});
+
+export const App = ({ children }: { children: React.ReactNode }) => (
+  <NearProvider nearStore={nearStore}>{children}</NearProvider>
+);
+```
+
+## NearStore
+
+The `nearStore` prop is created using `createNearStore` with the following configuration:
+
+```tsx
+type CreateNearStoreArgs = {
+  networkId: string;           // Network identifier (e.g., 'mainnet', 'testnet')
+  clientCreator: () => Client; // Function that creates a NEAR client
+  serviceCreator: ServiceCreator; // Service for wallet connection
+  storeName?: string;          // Optional name for the store (for debugging)
+};
+```
+
+## Implementation Details
+
+`NearProvider` wraps your application with:
+
+1. **NearStoreProvider**: Provides the NEAR store to all child components
+2. **QueryClientProvider**: Sets up React Query for managing async state
+
+The provider automatically configures React Query with:
+- No retries on failed queries
+- No retries on failed mutations
+
+<Note>
+  For most use cases, use `MainnetNearProvider` or `TestnetNearProvider` instead. Only use `NearProvider` when you need custom configuration.
+</Note>
+
+<Info>
+  The NEAR store is a Zustand store that manages the connection state, account information, and service instances.
+</Info>
+
+## Related
+
+- [MainnetNearProvider](/api/providers/mainnet-near-provider) - Pre-configured provider for mainnet
+- [TestnetNearProvider](/api/providers/testnet-near-provider) - Pre-configured provider for testnet
+- [createNearStore](/api/store/create-near-store) - Function to create NEAR stores

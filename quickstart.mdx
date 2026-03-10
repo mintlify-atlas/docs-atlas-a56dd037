@@ -1,80 +1,303 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Get up and running with react-near-ts in minutes"
 ---
 
-## Get started in three steps
+Build your first NEAR-enabled React application in just a few steps. This guide will walk you through setting up providers, connecting wallets, fetching account info, and executing transactions.
 
-Get your documentation site running locally and make your first customization.
+## Setup Your Provider
 
-### Step 1: Set up your local environment
+<Steps>
+  <Step title="Choose Your Network">
+    Start by wrapping your app with a provider. Use `TestnetNearProvider` for development or `MainnetNearProvider` for production.
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+    <CodeGroup>
+    ```tsx Testnet
+    import { TestnetNearProvider } from 'react-near-ts';
 
-### Step 2: Deploy your changes
+    export default function App() {
+      return (
+        <TestnetNearProvider>
+          <YourApp />
+        </TestnetNearProvider>
+      );
+    }
+    ```
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```tsx Mainnet
+    import { MainnetNearProvider } from 'react-near-ts';
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    export default function App() {
+      return (
+        <MainnetNearProvider>
+          <YourApp />
+        </MainnetNearProvider>
+      );
+    }
+    ```
+    </CodeGroup>
+  </Step>
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+  <Step title="Connect a Wallet">
+    Use the `useNearConnector` hook to enable wallet connections.
 
-### Step 3: Go live
+    ```tsx WalletButton.tsx
+    import { useNearConnector, useConnectedAccount } from 'react-near-ts';
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    export function WalletButton() {
+      const { connect, disconnect } = useNearConnector();
+      const { connectedAccountId, isConnectedAccount } = useConnectedAccount();
 
-## Next steps
+      if (isConnectedAccount) {
+        return (
+          <div>
+            <p>Connected as: {connectedAccountId}</p>
+            <button onClick={() => disconnect.mutate()}>
+              Disconnect
+            </button>
+          </div>
+        );
+      }
 
-Now that you have your docs running, explore these key features:
+      return (
+        <button onClick={() => connect.mutate()}>
+          Connect Wallet
+        </button>
+      );
+    }
+    ```
+  </Step>
+
+  <Step title="Fetch Account Balance">
+    Retrieve account information using `useAccountInfo`.
+
+    ```tsx AccountBalance.tsx
+    import { useAccountInfo, useConnectedAccount } from 'react-near-ts';
+
+    export function AccountBalance() {
+      const { connectedAccountId } = useConnectedAccount();
+      const accountInfo = useAccountInfo({ accountId: connectedAccountId });
+
+      if (accountInfo.isLoading) return <p>Loading balance...</p>;
+      if (accountInfo.isError) return <p>Error loading balance</p>;
+
+      return (
+        <div>
+          <h3>Account Balance</h3>
+          <p>Total: {accountInfo.data.accountInfo.balance.total.near} NEAR</p>
+          <p>Available: {accountInfo.data.accountInfo.balance.available.near} NEAR</p>
+        </div>
+      );
+    }
+    ```
+  </Step>
+
+  <Step title="Send a Transaction">
+    Execute transactions using `useExecuteTransaction` with action creators like `transfer` or `functionCall`.
+
+    ```tsx SendNEAR.tsx
+    import { useExecuteTransaction, transfer } from 'react-near-ts';
+    import { useState } from 'react';
+
+    export function SendNEAR() {
+      const executeTransaction = useExecuteTransaction();
+      const [receiver, setReceiver] = useState('');
+      const [amount, setAmount] = useState('');
+
+      const handleSend = () => {
+        executeTransaction.mutate({
+          intent: {
+            action: transfer({ amount: { near: amount } }),
+            receiverAccountId: receiver,
+          },
+        });
+      };
+
+      return (
+        <div>
+          <input
+            placeholder="Receiver account"
+            value={receiver}
+            onChange={(e) => setReceiver(e.target.value)}
+          />
+          <input
+            placeholder="Amount (NEAR)"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
+          <button
+            onClick={handleSend}
+            disabled={executeTransaction.isPending}
+          >
+            {executeTransaction.isPending ? 'Sending...' : 'Send NEAR'}
+          </button>
+        </div>
+      );
+    }
+    ```
+  </Step>
+</Steps>
+
+## Call Smart Contracts
+
+### Read Contract Data
+
+Use `useContractReadFunction` to call view-only contract methods.
+
+```tsx ReadContract.tsx
+import {
+  useContractReadFunction,
+  fromJsonBytes,
+  type DeserializeResultFnArgs,
+} from 'react-near-ts';
+import * as z from 'zod';
+
+const ResultSchema = z.array(z.string());
+
+const deserializeResult = ({ rawResult }: DeserializeResultFnArgs) =>
+  ResultSchema.parse(fromJsonBytes(rawResult));
+
+export function ContractRecords() {
+  const records = useContractReadFunction({
+    contractAccountId: 'react-near-ts.lantstool.testnet',
+    functionName: 'get_records',
+    functionArgs: { author_id: 'example.testnet' },
+    withStateAt: 'LatestOptimisticBlock',
+    options: { deserializeResult },
+  });
+
+  if (records.isLoading) return <p>Loading records...</p>;
+  if (records.isError) return <p>Error loading records</p>;
+
+  return (
+    <ul>
+      {records.data.map((record, i) => (
+        <li key={i}>{record}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+### Write Contract Data
+
+Execute contract methods that change state using `functionCall`.
+
+```tsx WriteContract.tsx
+import { useExecuteTransaction, functionCall } from 'react-near-ts';
+import { useState } from 'react';
+
+export function AddRecord() {
+  const executeTransaction = useExecuteTransaction();
+  const [record, setRecord] = useState('');
+
+  const handleAdd = () => {
+    executeTransaction.mutate({
+      intent: {
+        action: functionCall({
+          functionName: 'add_record',
+          functionArgs: { record },
+          gasLimit: { teraGas: '10' },
+        }),
+        receiverAccountId: 'react-near-ts.lantstool.testnet',
+      },
+    });
+  };
+
+  return (
+    <div>
+      <input
+        placeholder="Enter record"
+        value={record}
+        onChange={(e) => setRecord(e.target.value)}
+      />
+      <button onClick={handleAdd}>
+        Add Record
+      </button>
+    </div>
+  );
+}
+```
+
+## Complete Example
+
+Here's a full working application combining all the pieces:
+
+```tsx App.tsx
+import { TestnetNearProvider, useNearConnector, useConnectedAccount, useAccountInfo, useExecuteTransaction, transfer } from 'react-near-ts';
+
+function DashboardContent() {
+  const { connect, disconnect } = useNearConnector();
+  const { connectedAccountId, isConnectedAccount } = useConnectedAccount();
+  const accountInfo = useAccountInfo({ accountId: connectedAccountId });
+  const executeTransaction = useExecuteTransaction();
+
+  if (!isConnectedAccount) {
+    return <button onClick={() => connect.mutate()}>Connect Wallet</button>;
+  }
+
+  return (
+    <div>
+      <h2>Welcome, {connectedAccountId}</h2>
+      
+      {accountInfo.isSuccess && (
+        <p>Balance: {accountInfo.data.accountInfo.balance.available.near} NEAR</p>
+      )}
+
+      <button
+        onClick={() => executeTransaction.mutate({
+          intent: {
+            action: transfer({ amount: { near: '0.01' } }),
+            receiverAccountId: 'receiver.testnet',
+          },
+        })}
+      >
+        Send 0.01 NEAR
+      </button>
+
+      <button onClick={() => disconnect.mutate()}>Disconnect</button>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <TestnetNearProvider>
+      <DashboardContent />
+    </TestnetNearProvider>
+  );
+}
+```
+
+## Next Steps
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card
+    title="Core Concepts"
+    icon="book"
+    href="/concepts/providers"
+  >
+    Learn about providers, network configuration, and wallet connections
+  </Card>
+  <Card
+    title="Hooks Reference"
+    icon="code"
+    href="/api/hooks/use-near-connector"
+  >
+    Explore all available React hooks
+  </Card>
+  <Card
+    title="Contract Interactions"
+    icon="file-contract"
+    href="/guides/contract-interactions"
+  >
+    Deep dive into reading and writing contract data
+  </Card>
+  <Card
+    title="Custom Setup"
+    icon="gear"
+    href="/guides/custom-setup"
+  >
+    Configure custom RPC endpoints and advanced settings
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

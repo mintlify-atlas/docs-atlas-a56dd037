@@ -1,0 +1,322 @@
+---
+title: "Utilities"
+description: "Utility functions re-exported from near-api-ts for working with NEAR Protocol"
+---
+
+`react-near-ts` re-exports utility functions from `near-api-ts` for common tasks like token conversions, key pair generation, and data serialization.
+
+## Token Utilities
+
+Helpers for working with NEAR token amounts and conversions.
+
+### `nearToken`
+
+Creates a NEAR token amount object.
+
+```tsx
+import { nearToken } from 'react-near-ts';
+
+const amount = nearToken.from('1.5'); // 1.5 NEAR
+```
+
+---
+
+### `near`
+
+Converts a NEAR amount string to yoctoNEAR.
+
+```tsx
+import { near } from 'react-near-ts';
+
+const yoctoAmount = near('0.1'); // Returns yoctoNEAR equivalent
+```
+
+**Parameters:**
+
+<ParamField path="amount" type="string" required>
+  Amount in NEAR tokens (e.g., `"0.1"`)
+</ParamField>
+
+**Returns:** String representing the amount in yoctoNEAR.
+
+**Use case:** Converting user-friendly NEAR amounts to the base unit for calculations.
+
+---
+
+### `yoctoNear`
+
+Creates a yoctoNEAR amount (the smallest unit of NEAR).
+
+```tsx
+import { yoctoNear } from 'react-near-ts';
+
+const amount = yoctoNear('1000000000000000000000000'); // 1 NEAR in yoctoNEAR
+```
+
+**Parameters:**
+
+<ParamField path="amount" type="string" required>
+  Amount in yoctoNEAR (1 NEAR = 10^24 yoctoNEAR)
+</ParamField>
+
+**Returns:** String representing the amount in yoctoNEAR.
+
+**Use case:** Working with precise token amounts at the base unit level.
+
+<Info>
+1 NEAR = 1,000,000,000,000,000,000,000,000 yoctoNEAR (10^24)
+</Info>
+
+---
+
+## Gas Utilities
+
+Helpers for specifying gas limits in transactions.
+
+### `nearGas`
+
+Creates a gas amount object.
+
+```tsx
+import { nearGas } from 'react-near-ts';
+
+const gas = nearGas.from('100');
+```
+
+---
+
+### `gas`
+
+Converts a gas amount to the base unit.
+
+```tsx
+import { gas } from 'react-near-ts';
+
+const gasAmount = gas('50000000000000'); // 50 TGas
+```
+
+**Parameters:**
+
+<ParamField path="amount" type="string" required>
+  Gas amount in base units
+</ParamField>
+
+**Returns:** String representing the gas amount.
+
+---
+
+### `teraGas`
+
+Converts teragas (TGas) to the base gas unit.
+
+```tsx
+import { teraGas } from 'react-near-ts';
+
+const gasAmount = teraGas('10'); // 10 TGas
+```
+
+**Parameters:**
+
+<ParamField path="amount" type="string" required>
+  Gas amount in TGas (e.g., `"10"` for 10 TGas)
+</ParamField>
+
+**Returns:** String representing the gas amount in base units.
+
+**Use case:** Specifying gas limits in a user-friendly unit.
+
+<Info>
+1 TGas = 1,000,000,000,000 gas (10^12)
+</Info>
+
+---
+
+## Serialization Utilities
+
+Functions for converting between JSON and bytes when working with contract data.
+
+### `fromJsonBytes`
+
+Deserializes bytes to a JSON value.
+
+```tsx
+import { fromJsonBytes, useContractReadFunction, type DeserializeResultFnArgs } from 'react-near-ts';
+import * as z from 'zod/mini';
+
+const ResultSchema = z.array(z.string());
+
+const deserializeResult = ({ rawResult }: DeserializeResultFnArgs) =>
+  ResultSchema.parse(fromJsonBytes(rawResult));
+
+const records = useContractReadFunction({
+  contractAccountId: 'contract.testnet',
+  functionName: 'get_records',
+  functionArgs: { author_id: 'user.testnet' },
+  withStateAt: 'LatestOptimisticBlock',
+  options: { deserializeResult },
+});
+```
+
+**Parameters:**
+
+<ParamField path="bytes" type="Uint8Array" required>
+  Raw bytes returned from a contract call
+</ParamField>
+
+**Returns:** Parsed JSON value.
+
+**Use case:** Deserializing contract call results when using `useContractReadFunction`.
+
+---
+
+### `toJsonBytes`
+
+Serializes a JSON value to bytes.
+
+```tsx
+import { toJsonBytes } from 'react-near-ts';
+
+const data = { record: 'hello world' };
+const bytes = toJsonBytes(data);
+```
+
+**Parameters:**
+
+<ParamField path="value" type="any" required>
+  JSON-serializable value to convert
+</ParamField>
+
+**Returns:** `Uint8Array` containing the JSON bytes.
+
+**Use case:** Preparing data for contract calls that expect byte arrays.
+
+---
+
+## Key Pair Utilities
+
+Functions for generating cryptographic key pairs.
+
+### `keyPair`
+
+Creates a key pair from a secret key string or generates a new random one.
+
+```tsx
+import { keyPair } from 'react-near-ts';
+
+const kp = keyPair.fromString('ed25519:...');
+```
+
+---
+
+### `randomEd25519KeyPair`
+
+Generates a random Ed25519 key pair.
+
+```tsx
+import { randomEd25519KeyPair } from 'react-near-ts';
+
+const kp = randomEd25519KeyPair();
+const publicKey = kp.getPublicKey();
+const secretKey = kp.toString();
+```
+
+**Returns:** A new Ed25519 key pair object.
+
+**Methods:**
+- `getPublicKey()`: Returns the public key
+- `toString()`: Returns the secret key as a string
+- `sign(message)`: Signs a message with the private key
+
+**Use case:** Creating new access keys for accounts.
+
+<Info>
+Ed25519 is the recommended key type for NEAR Protocol.
+</Info>
+
+---
+
+### `randomSecp256k1KeyPair`
+
+Generates a random secp256k1 key pair (used for Ethereum compatibility).
+
+```tsx
+import { randomSecp256k1KeyPair } from 'react-near-ts';
+
+const kp = randomSecp256k1KeyPair();
+const publicKey = kp.getPublicKey();
+```
+
+**Returns:** A new secp256k1 key pair object.
+
+**Use case:** Ethereum-compatible key generation for cross-chain applications.
+
+---
+
+## Example: Complete Transaction with Utilities
+
+Here's a comprehensive example using multiple utilities:
+
+```tsx TransferExample.tsx
+import {
+  transfer,
+  near,
+  teraGas,
+  functionCall,
+  useExecuteTransaction,
+  useConnectedAccount,
+} from 'react-near-ts';
+
+function TransferExample() {
+  const executeTransaction = useExecuteTransaction();
+  const { isConnectedAccount } = useConnectedAccount();
+
+  const sendTokens = () => {
+    // Use near() to convert NEAR to yoctoNEAR
+    executeTransaction.mutate({
+      intent: {
+        action: transfer({ amount: { near: '0.1' } }),
+        receiverAccountId: 'receiver.testnet',
+      },
+    });
+  };
+
+  const callContract = () => {
+    // Use teraGas() for gas limit
+    executeTransaction.mutate({
+      intent: {
+        action: functionCall({
+          functionName: 'add_record',
+          functionArgs: { record: 'hello' },
+          gasLimit: { teraGas: '10' },
+          attachedDeposit: { near: '0' },
+        }),
+        receiverAccountId: 'contract.testnet',
+      },
+    });
+  };
+
+  if (!isConnectedAccount) return <p>Connect your wallet</p>;
+
+  return (
+    <>
+      <button onClick={sendTokens}>Send 0.1 NEAR</button>
+      <button onClick={callContract}>Call Contract</button>
+    </>
+  );
+}
+```
+
+## Learn More
+
+<CardGroup cols={2}>
+  <Card title="Contract Interactions" icon="file-contract" href="/guides/contract-interactions">
+    Guide on reading and writing contract data
+  </Card>
+  <Card title="useContractReadFunction" icon="book-open" href="/api/hooks/use-contract-read-function">
+    Hook for reading contract data with serialization
+  </Card>
+</CardGroup>
+
+<Card title="near-api-ts Documentation" icon="arrow-up-right-from-square" href="https://github.com/near/near-api-ts">
+  Official near-api-ts documentation on GitHub
+</Card>

@@ -1,0 +1,199 @@
+---
+title: useConnectedAccount
+description: Hook for accessing the currently connected NEAR account
+---
+
+## Overview
+
+`useConnectedAccount` provides access to the currently connected NEAR account. It returns the connected account ID and a boolean flag indicating whether an account is connected.
+
+## Import
+
+```typescript
+import { useConnectedAccount } from 'react-near-ts';
+```
+
+## Type Signature
+
+```typescript
+type UseConnectedAccount = () => {
+  connectedAccountId: string | undefined;
+  isConnectedAccount: boolean;
+};
+```
+
+Source: [src/hooks/useConnectedAccount.ts:3](https://github.com/hot-labs/react-near-ts/blob/main/src/hooks/useConnectedAccount.ts#L3)
+
+## Usage
+
+### Basic Usage
+
+```typescript
+import { useConnectedAccount } from 'react-near-ts';
+
+function AccountDisplay() {
+  const { connectedAccountId, isConnectedAccount } = useConnectedAccount();
+
+  if (!isConnectedAccount) {
+    return <p>No wallet connected</p>;
+  }
+
+  return <p>Connected as: {connectedAccountId}</p>;
+}
+```
+
+### Conditional Rendering
+
+```typescript
+import { useConnectedAccount } from 'react-near-ts';
+
+function Dashboard() {
+  const { isConnectedAccount } = useConnectedAccount();
+
+  if (!isConnectedAccount) {
+    return (
+      <div>
+        <h2>Welcome</h2>
+        <p>Please connect your wallet to continue.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h2>Dashboard</h2>
+      {/* Protected content */}
+    </div>
+  );
+}
+```
+
+### With Account Info Hook
+
+```typescript
+import { useConnectedAccount, useAccountInfo } from 'react-near-ts';
+
+function AccountBalance() {
+  const { connectedAccountId, isConnectedAccount } = useConnectedAccount();
+  const accountInfo = useAccountInfo({ accountId: connectedAccountId });
+
+  if (!isConnectedAccount) {
+    return <p>Connect wallet to see balance</p>;
+  }
+
+  if (accountInfo.isPending) {
+    return <p>Loading balance...</p>;
+  }
+
+  if (accountInfo.isError) {
+    return <p>Failed to load balance</p>;
+  }
+
+  return (
+    <div>
+      <p>Account: {connectedAccountId}</p>
+      <p>Balance: {accountInfo.data.accountInfo.balance.total.near} NEAR</p>
+    </div>
+  );
+}
+```
+
+### Disabling Actions When Not Connected
+
+```typescript
+import { useConnectedAccount, useExecuteTransaction } from 'react-near-ts';
+import { transfer } from 'react-near-ts';
+
+function SendTokens() {
+  const { isConnectedAccount } = useConnectedAccount();
+  const executeTransaction = useExecuteTransaction();
+
+  const handleSend = () => {
+    executeTransaction.mutate({
+      intent: {
+        action: transfer({ amount: { near: '1' } }),
+        receiverAccountId: 'receiver.testnet',
+      },
+    });
+  };
+
+  return (
+    <button 
+      onClick={handleSend}
+      disabled={!isConnectedAccount}
+    >
+      Send NEAR
+    </button>
+  );
+}
+```
+
+## Return Value
+
+<ResponseField name="connectedAccountId" type="string | undefined">
+  The account ID of the currently connected wallet. Returns `undefined` if no wallet is connected.
+  
+  Example: `"user.testnet"` or `"alice.near"`
+</ResponseField>
+
+<ResponseField name="isConnectedAccount" type="boolean">
+  Boolean flag indicating whether a wallet is currently connected.
+  
+  - `true` if `connectedAccountId` is a string
+  - `false` if `connectedAccountId` is `undefined`
+</ResponseField>
+
+## Behavior
+
+- The hook subscribes to the NEAR store's `connectedAccountId` state
+- Updates automatically when connection state changes
+- Returns immediately with current connection status
+- No async operations or loading states
+
+## Common Patterns
+
+### Guard Clauses
+
+```typescript
+function ProtectedComponent() {
+  const { isConnectedAccount } = useConnectedAccount();
+
+  if (!isConnectedAccount) {
+    return <ConnectWalletPrompt />;
+  }
+
+  // Rest of component logic
+}
+```
+
+### Query Enablement
+
+```typescript
+function UserData() {
+  const { connectedAccountId, isConnectedAccount } = useConnectedAccount();
+  
+  const data = useContractReadFunction({
+    contractAccountId: 'contract.testnet',
+    functionName: 'get_user_data',
+    functionArgs: { user_id: connectedAccountId },
+    query: {
+      enabled: isConnectedAccount, // Only query when connected
+    },
+  });
+
+  // ...
+}
+```
+
+## Related Hooks
+
+- [useNearConnector](/api/hooks/use-near-connector) - Connect and disconnect wallets
+- [useAccountInfo](/api/hooks/use-account-info) - Fetch detailed account information
+- [useExecuteTransaction](/api/hooks/use-execute-transaction) - Execute transactions with connected wallet
+
+## Examples from Playground
+
+See real-world usage:
+- [Account Info Page](https://github.com/hot-labs/react-near-ts/blob/main/playgrounds/next-app-router/src/app/account-info/page.tsx#L16)
+- [Send NEAR Page](https://github.com/hot-labs/react-near-ts/blob/main/playgrounds/next-app-router/src/app/send-near/page.tsx#L19)
+- [Topbar Component](https://github.com/hot-labs/react-near-ts/blob/main/playgrounds/next-app-router/src/app/_components/Topbar/Topbar.tsx#L17)

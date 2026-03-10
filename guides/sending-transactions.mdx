@@ -1,0 +1,255 @@
+---
+title: Sending Transactions
+description: Learn how to send NEAR tokens and execute contract functions with useExecuteTransaction
+---
+
+The `useExecuteTransaction` hook enables you to send signed transactions from the connected wallet.
+
+## Transferring NEAR Tokens
+
+Send NEAR tokens to any account:
+
+### Basic Transfer
+
+```tsx
+import { transfer, useExecuteTransaction } from 'react-near-ts';
+
+function SendTokens() {
+  const executeTransaction = useExecuteTransaction();
+
+  const sendNear = () => {
+    executeTransaction.mutate({
+      intent: {
+        action: transfer({ amount: { near: '0.1' } }),
+        receiverAccountId: 'receiver.testnet',
+      },
+    });
+  };
+
+  return (
+    <button onClick={sendNear} disabled={executeTransaction.isPending}>
+      Send 0.1 NEAR
+    </button>
+  );
+}
+```
+
+### Complete Transfer Example
+
+Here's a full example with form handling and transaction status:
+
+```tsx
+import { useState } from 'react';
+import { transfer, useConnectedAccount, useExecuteTransaction } from 'react-near-ts';
+
+function SendNear() {
+  const { isConnectedAccount } = useConnectedAccount();
+  const executeTransaction = useExecuteTransaction();
+  const [amount, setAmount] = useState('');
+  const [unit, setUnit] = useState<'near' | 'yoctoNear'>('near');
+  const [receiverAccountId, setReceiverAccountId] = useState('');
+
+  const sendTokens = () => {
+    const tokens = unit === 'near' ? { near: amount } : { yoctoNear: amount };
+
+    executeTransaction.mutate({
+      intent: {
+        action: transfer({ amount: tokens }),
+        receiverAccountId: receiverAccountId.trim(),
+      },
+    });
+  };
+
+  if (!isConnectedAccount) {
+    return <p>Connect your wallet to send NEAR tokens</p>;
+  }
+
+  return (
+    <div>
+      <h3>Send Tokens</h3>
+      <p>Transfer NEAR or yoctoNEAR in one transaction</p>
+
+      <div>
+        <input
+          type="text"
+          placeholder="0.1"
+          value={amount}
+          onChange={(e) => setAmount(e.currentTarget.value)}
+        />
+        <select value={unit} onChange={(e) => setUnit(e.target.value as 'near' | 'yoctoNear')}>
+          <option value="near">NEAR</option>
+          <option value="yoctoNear">yoctoNEAR</option>
+        </select>
+      </div>
+
+      <input
+        type="text"
+        placeholder="receiver.testnet"
+        value={receiverAccountId}
+        onChange={(e) => setReceiverAccountId(e.currentTarget.value)}
+      />
+
+      <button
+        onClick={sendTokens}
+        disabled={!isConnectedAccount || executeTransaction.isPending}
+      >
+        {executeTransaction.isPending ? 'Sending...' : 'Send Tokens'}
+      </button>
+
+      {executeTransaction.isSuccess && (
+        <div>
+          <p>Transaction executed successfully</p>
+          <p>Hash: {executeTransaction.data.rawRpcResult.transaction.hash}</p>
+        </div>
+      )}
+
+      {executeTransaction.isError && (
+        <p>Error: {executeTransaction.error.message}</p>
+      )}
+    </div>
+  );
+}
+```
+
+<Note>
+  You can specify amounts in either `near` (human-readable) or `yoctoNear` (smallest unit).
+</Note>
+
+## Function Calls
+
+Execute smart contract methods that modify state:
+
+### Basic Function Call
+
+```tsx
+import { functionCall, useExecuteTransaction } from 'react-near-ts';
+
+function CallContract() {
+  const executeTransaction = useExecuteTransaction();
+
+  const addRecord = () => {
+    executeTransaction.mutate({
+      intent: {
+        action: functionCall({
+          functionName: 'add_record',
+          functionArgs: { record: 'hello' },
+          gasLimit: { teraGas: '10' },
+        }),
+        receiverAccountId: 'react-near-ts.lantstool.testnet',
+      },
+    });
+  };
+
+  return <button onClick={addRecord}>Add Record</button>;
+}
+```
+
+### Function Call with Deposit
+
+Some contract methods require a NEAR deposit:
+
+```tsx
+import { functionCall, useExecuteTransaction } from 'react-near-ts';
+
+const executeTransaction = useExecuteTransaction();
+
+executeTransaction.mutate({
+  intent: {
+    action: functionCall({
+      functionName: 'buy_item',
+      functionArgs: { item_id: '123' },
+      gasLimit: { teraGas: '30' },
+      deposit: { near: '1' }, // Attach 1 NEAR
+    }),
+    receiverAccountId: 'marketplace.near',
+  },
+});
+```
+
+## Transaction Status
+
+The `useExecuteTransaction` hook returns a mutation object with status flags:
+
+```tsx
+const executeTransaction = useExecuteTransaction();
+
+// Status flags
+executeTransaction.isPending   // Transaction in progress
+executeTransaction.isSuccess   // Transaction completed successfully
+executeTransaction.isError     // Transaction failed
+executeTransaction.error       // Error object (if failed)
+executeTransaction.data        // Transaction result (if successful)
+```
+
+### Handling Transaction Results
+
+```tsx
+executeTransaction.mutate(
+  {
+    intent: {
+      action: transfer({ amount: { near: '0.1' } }),
+      receiverAccountId: 'receiver.testnet',
+    },
+  },
+  {
+    onSuccess: (data) => {
+      console.log('Transaction successful:', data);
+      // Refresh data, show success message, etc.
+    },
+    onError: (error) => {
+      console.error('Transaction failed:', error);
+      // Show error message to user
+    },
+  },
+);
+```
+
+<Tip>
+  Use the `onSuccess` callback to invalidate cached queries and keep your UI in sync after transactions.
+</Tip>
+
+## Gas and Deposit Units
+
+### Gas Limits
+
+```tsx
+functionCall({
+  functionName: 'my_function',
+  gasLimit: { teraGas: '30' }, // or { gas: '30000000000000' }
+})
+```
+
+### Token Amounts
+
+```tsx
+// Using NEAR
+transfer({ amount: { near: '1.5' } })
+
+// Using yoctoNEAR (1 NEAR = 10^24 yoctoNEAR)
+transfer({ amount: { yoctoNear: '1500000000000000000000000' } })
+```
+
+## Multiple Actions
+
+You can batch multiple actions in a single transaction (advanced use case - refer to NEAR API TS documentation for details).
+
+## Error Handling
+
+Common transaction errors:
+
+- **Insufficient balance** - Not enough NEAR to cover the transaction and gas fees
+- **Invalid receiver** - Receiver account doesn't exist
+- **Contract panic** - Smart contract encountered an error
+- **Not signed in** - User not connected with wallet
+
+```tsx
+if (executeTransaction.isError) {
+  const errorMessage = executeTransaction.error.message;
+  
+  if (errorMessage.includes('insufficient')) {
+    return <p>Insufficient balance for this transaction</p>;
+  }
+  
+  return <p>Transaction failed: {errorMessage}</p>;
+}
+```

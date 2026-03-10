@@ -1,0 +1,191 @@
+---
+title: useNearConnector
+description: Hook for connecting and disconnecting NEAR wallets
+---
+
+## Overview
+
+`useNearConnector` provides wallet connection functionality for NEAR Protocol. It returns mutation functions to connect and disconnect wallets, managing the connection state and signers in the application.
+
+## Import
+
+```typescript
+import { useNearConnector } from 'react-near-ts';
+```
+
+## Type Signature
+
+```typescript
+type UseNearConnect = () => {
+  connect: UseMutationResult<void, Error, void, unknown>;
+  disconnect: UseMutationResult<void, Error, void, unknown>;
+};
+```
+
+Source: [src/hooks/useNearConnector.ts:15](https://github.com/hot-labs/react-near-ts/blob/main/src/hooks/useNearConnector.ts#L15)
+
+## Usage
+
+### Basic Wallet Connection
+
+```typescript
+import { useNearConnector } from 'react-near-ts';
+
+function WalletButton() {
+  const { connect, disconnect } = useNearConnector();
+
+  return (
+    <div>
+      <button onClick={() => connect.mutate()}>
+        Connect Wallet
+      </button>
+      <button onClick={() => disconnect.mutate()}>
+        Disconnect
+      </button>
+    </div>
+  );
+}
+```
+
+### With Loading States
+
+```typescript
+import { useNearConnector, useConnectedAccount } from 'react-near-ts';
+
+function ConnectButton() {
+  const { connect, disconnect } = useNearConnector();
+  const { isConnectedAccount, connectedAccountId } = useConnectedAccount();
+
+  if (isConnectedAccount) {
+    return (
+      <button 
+        onClick={() => disconnect.mutate()}
+        disabled={disconnect.isPending}
+      >
+        {disconnect.isPending ? 'Disconnecting...' : `Disconnect ${connectedAccountId}`}
+      </button>
+    );
+  }
+
+  return (
+    <button 
+      onClick={() => connect.mutate()}
+      disabled={connect.isPending}
+    >
+      {connect.isPending ? 'Connecting...' : 'Connect Wallet'}
+    </button>
+  );
+}
+```
+
+### Error Handling
+
+```typescript
+import { useNearConnector } from 'react-near-ts';
+
+function WalletConnection() {
+  const { connect, disconnect } = useNearConnector();
+
+  return (
+    <div>
+      <button onClick={() => connect.mutate()}>Connect</button>
+      
+      {connect.isError && (
+        <p>Connection failed: {connect.error.message}</p>
+      )}
+      
+      {disconnect.isError && (
+        <p>Disconnection failed: {disconnect.error.message}</p>
+      )}
+    </div>
+  );
+}
+```
+
+## Return Value
+
+<ResponseField name="connect" type="UseMutationResult<void, Error, void, unknown>">
+  TanStack Query mutation for connecting a wallet.
+  
+  <Expandable title="properties">
+    <ResponseField name="mutate" type="() => void">
+      Initiates the wallet connection flow. Opens the wallet selector and connects the first available account.
+    </ResponseField>
+    
+    <ResponseField name="mutateAsync" type="() => Promise<void>">
+      Async version of mutate that returns a promise.
+    </ResponseField>
+    
+    <ResponseField name="isPending" type="boolean">
+      `true` while the connection is in progress.
+    </ResponseField>
+    
+    <ResponseField name="isSuccess" type="boolean">
+      `true` if the connection completed successfully.
+    </ResponseField>
+    
+    <ResponseField name="isError" type="boolean">
+      `true` if the connection failed.
+    </ResponseField>
+    
+    <ResponseField name="error" type="Error | null">
+      The error object if connection failed.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="disconnect" type="UseMutationResult<void, Error, void, unknown>">
+  TanStack Query mutation for disconnecting the wallet.
+  
+  <Expandable title="properties">
+    <ResponseField name="mutate" type="() => void">
+      Disconnects the wallet, clears signers, and removes the connected account ID from state.
+    </ResponseField>
+    
+    <ResponseField name="mutateAsync" type="() => Promise<void>">
+      Async version of mutate that returns a promise.
+    </ResponseField>
+    
+    <ResponseField name="isPending" type="boolean">
+      `true` while the disconnection is in progress.
+    </ResponseField>
+    
+    <ResponseField name="isSuccess" type="boolean">
+      `true` if the disconnection completed successfully.
+    </ResponseField>
+    
+    <ResponseField name="isError" type="boolean">
+      `true` if the disconnection failed.
+    </ResponseField>
+    
+    <ResponseField name="error" type="Error | null">
+      The error object if disconnection failed.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Behavior
+
+### Connection Flow
+
+1. Calls `connector.connect()` to open wallet selector
+2. Retrieves connected accounts from the wallet
+3. Sets the first account as the connected account
+4. Initializes signers for the connected account
+5. Updates application state with connection info
+
+### Disconnection Flow
+
+1. Calls `connector.disconnect()` to close wallet connection
+2. Clears all signers from state
+3. Removes the connected account ID
+4. Returns application to disconnected state
+
+## Related Hooks
+
+- [useConnectedAccount](/api/hooks/use-connected-account) - Get the currently connected account
+- [useExecuteTransaction](/api/hooks/use-execute-transaction) - Execute transactions with the connected wallet
+
+## Type Definitions
+
+Source: [types/hooks/useNearConnect.ts](https://github.com/hot-labs/react-near-ts/blob/main/types/hooks/useNearConnect.ts)

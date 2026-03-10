@@ -1,0 +1,380 @@
+---
+title: useContractReadFunction
+description: Hook for calling read-only (view) functions on NEAR smart contracts
+---
+
+## Overview
+
+`useContractReadFunction` calls read-only smart contract functions on NEAR. It uses TanStack Query for automatic caching, background refetching, and request deduplication. Supports custom serialization/deserialization of arguments and results.
+
+## Import
+
+```typescript
+import { useContractReadFunction } from 'react-near-ts';
+```
+
+## Type Signature
+
+```typescript
+type UseContractReadFunction = {
+  // Basic usage - JSON args, unknown result
+  <A extends MaybeJsonLikeValue = undefined>(
+    args: BaseUseContractReadFunctionArgs & FunctionArgs<A> & Options<undefined, undefined, undefined>,
+  ): UseQueryResult<CallOutput<undefined>, CallContractReadFunctionError>;
+  
+  // With custom deserializer
+  <DR extends BaseDeserializeResultFn, A extends MaybeJsonLikeValue = undefined>(
+    args: BaseUseContractReadFunctionArgs & FunctionArgs<A> & Options<undefined, undefined, DR>,
+  ): UseQueryResult<CallOutput<DR>, CallContractReadFunctionError>;
+  
+  // With custom serializer and optional deserializer
+  <SA extends BaseSerializeArgsFn<A>, DR extends MaybeBaseDeserializeResultFn = undefined, A = FunctionArgsOf<SA>>(
+    args: BaseUseContractReadFunctionArgs & FunctionArgs<A> & Options<A, SA, DR>,
+  ): UseQueryResult<CallOutput<DR>, CallContractReadFunctionError>;
+};
+```
+
+Source: [types/hooks/useContractReadFunction.ts:59](https://github.com/hot-labs/react-near-ts/blob/main/types/hooks/useContractReadFunction.ts#L59)
+
+## Parameters
+
+<ParamField path="contractAccountId" type="AccountId" required>
+  The account ID of the smart contract to call.
+  
+  Example: `"contract.testnet"` or `"app.near"`
+  
+  **Note:** Query will not execute if `contractAccountId` is `undefined`.
+</ParamField>
+
+<ParamField path="functionName" type="ContractFunctionName" required>
+  The name of the contract function to call.
+  
+  Example: `"get_records"` or `"get_user_data"`
+  
+  **Note:** Query will not execute if `functionName` is `undefined`.
+</ParamField>
+
+<ParamField path="functionArgs" type="any">
+  Arguments to pass to the contract function. Will be JSON-serialized by default unless custom `serializeArgs` is provided.
+  
+  Example: `{ user_id: "alice.testnet" }`
+</ParamField>
+
+<ParamField path="withStateAt" type="BlockReference">
+  Block reference to query contract state at a specific point in time.
+  
+  Options:
+  - `"LatestOptimisticBlock"` - Most recent block (default)
+  - `"LatestFinalBlock"` - Latest finalized block
+  - `{ blockHash: string }` - Specific block by hash
+  - `{ blockHeight: number }` - Specific block by height
+</ParamField>
+
+<ParamField path="options" type="object">
+  Custom serialization and deserialization functions.
+  
+  <Expandable title="properties">
+    <ParamField path="options.serializeArgs" type="BaseSerializeArgsFn<A>">
+      Custom function to serialize function arguments to `Uint8Array`.
+      
+      Signature: `(args: { functionArgs: A }) => Uint8Array`
+      
+      If not provided, arguments are JSON-serialized using `toJsonBytes(functionArgs)`.
+    </ParamField>
+    
+    <ParamField path="options.deserializeResult" type="BaseDeserializeResultFn">
+      Custom function to deserialize the contract result.
+      
+      Signature: `(args: { rawResult: Uint8Array }) => T`
+      
+      If not provided, result is returned as `unknown`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="policies" type="object">
+  Transport and retry policies for the RPC request.
+  
+  <Expandable title="properties">
+    <ParamField path="policies.transport" type="PartialTransportPolicy">
+      Custom transport configuration including retry logic and timeouts.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="query" type="object">
+  TanStack Query options.
+  
+  <Expandable title="properties">
+    <ParamField path="query.enabled" type="boolean" default="true">
+      Whether the query should execute automatically. Set to `false` to disable the query.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Return Value
+
+<ResponseField name="data" type="CallContractReadFunctionOutput<T>">
+  The contract call result when the query succeeds.
+  
+  <Expandable title="properties">
+    <ResponseField name="result" type="T">
+      The deserialized contract function result. Type depends on `deserializeResult` function.
+    </ResponseField>
+    
+    <ResponseField name="rawRpcResult" type="object">
+      Raw RPC response from the NEAR node.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="isPending" type="boolean">
+  `true` while the query is loading.
+</ResponseField>
+
+<ResponseField name="isError" type="boolean">
+  `true` if the query failed.
+</ResponseField>
+
+<ResponseField name="error" type="CallContractReadFunctionError | null">
+  Error object if the query failed.
+</ResponseField>
+
+<ResponseField name="isSuccess" type="boolean">
+  `true` if the query completed successfully.
+</ResponseField>
+
+<ResponseField name="refetch" type="() => Promise<UseQueryResult>">
+  Function to manually refetch the contract data.
+</ResponseField>
+
+## Usage
+
+### Basic Usage
+
+```typescript
+import { useContractReadFunction } from 'react-near-ts';
+
+function ContractData() {
+  const result = useContractReadFunction({
+    contractAccountId: 'contract.testnet',
+    functionName: 'get_status',
+  });
+
+  if (result.isPending) return <p>Loading...</p>;
+  if (result.isError) return <p>Error: {result.error.message}</p>;
+
+  return <pre>{JSON.stringify(result.data.result, null, 2)}</pre>;
+}
+```
+
+### With Function Arguments
+
+```typescript
+import { useContractReadFunction } from 'react-near-ts';
+
+function UserRecords({ userId }) {
+  const records = useContractReadFunction({
+    contractAccountId: 'react-near-ts.lantstool.testnet',
+    functionName: 'get_records',
+    functionArgs: { author_id: userId },
+  });
+
+  if (records.isPending) return <p>Loading records...</p>;
+  if (records.isError) return <p>Failed to load records</p>;
+
+  return (
+    <ul>
+      {records.data.result.map((record, i) => (
+        <li key={i}>{record}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+### With Custom Deserialization
+
+```typescript
+import { 
+  useContractReadFunction, 
+  fromJsonBytes, 
+  type DeserializeResultFnArgs 
+} from 'react-near-ts';
+import * as z from 'zod';
+
+// Define result schema
+const ResultSchema = z.array(z.string());
+
+// Custom deserializer with validation
+const deserializeResult = (args: DeserializeResultFnArgs) =>
+  ResultSchema.parse(fromJsonBytes(args.rawResult));
+
+function ValidatedRecords({ userId }) {
+  const records = useContractReadFunction({
+    contractAccountId: 'contract.testnet',
+    functionName: 'get_records',
+    functionArgs: { author_id: userId },
+    options: {
+      deserializeResult,
+    },
+  });
+
+  // records.data.result is now typed as string[]
+  return (
+    <div>
+      {records.data?.result.map((record, i) => (
+        <p key={i}>{record}</p>
+      ))}
+    </div>
+  );
+}
+```
+
+### Conditional Querying
+
+```typescript
+import { useConnectedAccount, useContractReadFunction } from 'react-near-ts';
+
+function MyRecords() {
+  const { connectedAccountId, isConnectedAccount } = useConnectedAccount();
+
+  const records = useContractReadFunction({
+    contractAccountId: 'contract.testnet',
+    functionName: 'get_records',
+    functionArgs: { author_id: connectedAccountId },
+    withStateAt: 'LatestOptimisticBlock',
+    query: {
+      enabled: isConnectedAccount, // Only query when connected
+    },
+  });
+
+  if (!isConnectedAccount) {
+    return <p>Connect wallet to see your records</p>;
+  }
+
+  if (records.isPending) return <p>Loading...</p>;
+  if (records.isError) return <p>Error loading records</p>;
+
+  return (
+    <div>
+      <h3>Your Records</h3>
+      {records.data.result.map((record, i) => (
+        <p key={i}>{record}</p>
+      ))}
+    </div>
+  );
+}
+```
+
+### Querying Historical State
+
+```typescript
+import { useContractReadFunction } from 'react-near-ts';
+
+function HistoricalData({ blockHeight }) {
+  const result = useContractReadFunction({
+    contractAccountId: 'contract.testnet',
+    functionName: 'get_total_supply',
+    withStateAt: { blockHeight },
+  });
+
+  if (result.isPending) return <p>Loading...</p>;
+
+  return (
+    <div>
+      <p>Total supply at block {blockHeight}:</p>
+      <p>{result.data.result}</p>
+    </div>
+  );
+}
+```
+
+### With Finalized Blocks Only
+
+```typescript
+import { useContractReadFunction } from 'react-near-ts';
+
+function CriticalData() {
+  const result = useContractReadFunction({
+    contractAccountId: 'contract.testnet',
+    functionName: 'get_balance',
+    functionArgs: { account_id: 'user.testnet' },
+    withStateAt: 'LatestFinalBlock', // Use finalized blocks only
+  });
+
+  // ...
+}
+```
+
+### Manual Refetch
+
+```typescript
+import { useContractReadFunction } from 'react-near-ts';
+
+function RefreshableData() {
+  const result = useContractReadFunction({
+    contractAccountId: 'contract.testnet',
+    functionName: 'get_status',
+  });
+
+  return (
+    <div>
+      {result.data && <pre>{JSON.stringify(result.data.result, null, 2)}</pre>}
+      <button 
+        onClick={() => result.refetch()}
+        disabled={result.isPending}
+      >
+        {result.isPending ? 'Refreshing...' : 'Refresh'}
+      </button>
+    </div>
+  );
+}
+```
+
+## Caching Behavior
+
+- **Query Key:** `['callContractReadFunction', contractAccountId, functionName, functionArgs]`
+- Automatically caches results based on contract, function, and arguments
+- Shares cached data across components with identical parameters
+- Automatically refetches on window focus by default (TanStack Query behavior)
+- Deduplicates simultaneous identical requests
+
+## Error Handling
+
+The query can fail for several reasons:
+
+- Contract account does not exist
+- Function does not exist on contract
+- Function execution failed (panic, assertion, etc.)
+- Network/RPC errors
+- Serialization/deserialization errors
+
+```typescript
+if (result.isError) {
+  console.error('Contract call error:', result.error);
+  // Handle error appropriately
+}
+```
+
+## Performance Tips
+
+1. **Use conditional querying** to avoid unnecessary requests
+2. **Leverage caching** by reusing identical query parameters across components
+3. **Use `withStateAt: 'LatestOptimisticBlock'`** for fastest responses (slightly less reliable)
+4. **Use `withStateAt: 'LatestFinalBlock'`** for critical data (slower but guaranteed finalized)
+
+## Related Hooks
+
+- [useExecuteTransaction](/api/hooks/use-execute-transaction) - Execute state-changing contract calls
+- [useAccountInfo](/api/hooks/use-account-info) - Fetch account information
+- [useConnectedAccount](/api/hooks/use-connected-account) - Get connected account for conditional queries
+
+## Type Definitions
+
+Source: [types/hooks/useContractReadFunction.ts](https://github.com/hot-labs/react-near-ts/blob/main/types/hooks/useContractReadFunction.ts)
+
+## Examples from Playground
+
+See real-world implementation:
+- [useReadRecords Hook](https://github.com/hot-labs/react-near-ts/blob/main/playgrounds/next-app-router/src/app/contract-records/useReadRecords.ts)

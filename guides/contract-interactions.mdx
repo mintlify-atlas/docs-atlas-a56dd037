@@ -1,0 +1,227 @@
+---
+title: Contract Interactions
+description: Learn how to read from and write to NEAR smart contracts
+---
+
+Interact with NEAR smart contracts using read-only calls and write operations.
+
+## Reading Contract Data
+
+Use `useContractReadFunction` to call view methods that don't modify state:
+
+### Basic Read Example
+
+```tsx
+import {
+  useContractReadFunction,
+  fromJsonBytes,
+  type DeserializeResultFnArgs,
+} from 'react-near-ts';
+import * as z from 'zod/mini';
+
+const ResultSchema = z.array(z.string());
+
+const deserializeResult = ({ rawResult }: DeserializeResultFnArgs) =>
+  ResultSchema.parse(fromJsonBytes(rawResult));
+
+function ContractRecords() {
+  const records = useContractReadFunction({
+    contractAccountId: 'react-near-ts.lantstool.testnet',
+    functionName: 'get_records',
+    functionArgs: { author_id: 'example.testnet' },
+    withStateAt: 'LatestOptimisticBlock',
+    options: { deserializeResult },
+  });
+
+  if (records.isPending) return <p>Loading...</p>;
+  if (records.isError) return <p>Error loading records</p>;
+
+  return (
+    <ul>
+      {records.data.result.map((record, index) => (
+        <li key={index}>{record}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+### Real-World Example
+
+Here's a complete example that reads user-specific data:
+
+```tsx
+import {
+  type DeserializeResultFnArgs,
+  fromJsonBytes,
+  useConnectedAccount,
+  useContractReadFunction,
+} from 'react-near-ts';
+import * as z from 'zod/mini';
+
+const ResultSchema = z.array(z.string());
+
+const deserializeResult = (args: DeserializeResultFnArgs) =>
+  ResultSchema.parse(fromJsonBytes(args.rawResult));
+
+export function useReadRecords() {
+  const { connectedAccountId, isConnectedAccount } = useConnectedAccount();
+
+  return useContractReadFunction({
+    contractAccountId: 'react-near-ts.lantstool.testnet',
+    functionName: 'get_records',
+    functionArgs: { author_id: connectedAccountId },
+    withStateAt: 'LatestOptimisticBlock',
+    options: {
+      deserializeResult,
+    },
+    query: {
+      enabled: isConnectedAccount,
+    },
+  });
+}
+```
+
+<Note>
+  You must provide a `deserializeResult` function to parse the raw bytes returned from the contract into your expected TypeScript type.
+</Note>
+
+## Writing to Contracts
+
+Use `useExecuteTransaction` with `functionCall` to execute state-changing methods:
+
+### Add Record Example
+
+```tsx
+import { functionCall, useExecuteTransaction } from 'react-near-ts';
+
+function AddRecordForm() {
+  const executeTransaction = useExecuteTransaction();
+  const [record, setRecord] = useState('');
+
+  const addRecord = () => {
+    executeTransaction.mutate({
+      intent: {
+        action: functionCall({
+          functionName: 'add_record',
+          functionArgs: { record },
+          gasLimit: { teraGas: '10' },
+        }),
+        receiverAccountId: 'react-near-ts.lantstool.testnet',
+      },
+    });
+  };
+
+  return (
+    <div>
+      <input
+        value={record}
+        onChange={(e) => setRecord(e.target.value)}
+        placeholder="Enter record"
+      />
+      <button
+        onClick={addRecord}
+        disabled={executeTransaction.isPending}
+      >
+        {executeTransaction.isPending ? 'Adding...' : 'Add Record'}
+      </button>
+      {executeTransaction.isError && (
+        <p>Error: {executeTransaction.error.message}</p>
+      )}
+    </div>
+  );
+}
+```
+
+### With Cache Invalidation
+
+Invalidate queries after a successful mutation to refresh the UI:
+
+```tsx
+import { functionCall, useExecuteTransaction } from 'react-near-ts';
+
+export function useAddRecord(setRecordInput) {
+  const executeTransaction = useExecuteTransaction();
+
+  return {
+    addRecord: (record: string) => {
+      executeTransaction.mutate(
+        {
+          intent: {
+            action: functionCall({
+              functionName: 'add_record',
+              functionArgs: { record },
+              gasLimit: { teraGas: '10' },
+            }),
+            receiverAccountId: 'react-near-ts.lantstool.testnet',
+          },
+        },
+        {
+          onSuccess: (_data, _variables, _onMutateResult, context) => {
+            setRecordInput('');
+            context.client.invalidateQueries({
+              queryKey: ['callContractReadFunction', 'react-near-ts.lantstool.testnet', 'get_records'],
+            });
+          },
+        },
+      );
+    },
+    addRecordMutation: executeTransaction,
+  };
+}
+```
+
+### Delete Operations
+
+```tsx
+import { functionCall, useExecuteTransaction } from 'react-near-ts';
+
+export function useRemoveRecord() {
+  const removeRecordMutation = useExecuteTransaction();
+
+  return {
+    removeRecord: (index: number) => {
+      removeRecordMutation.mutate(
+        {
+          intent: {
+            action: functionCall({
+              functionName: 'remove_record',
+              functionArgs: { index },
+              gasLimit: { teraGas: '10' },
+            }),
+            receiverAccountId: 'react-near-ts.lantstool.testnet',
+          },
+        },
+        {
+          onSuccess: (_data, _variables, _onMutateResult, context) => {
+            context.client.invalidateQueries({
+              queryKey: ['callContractReadFunction', 'react-near-ts.lantstool.testnet', 'get_records'],
+            });
+          },
+        },
+      );
+    },
+    removeRecordMutation,
+  };
+}
+```
+
+<Tip>
+  Always specify appropriate gas limits for your contract calls. Most simple operations work well with `{ teraGas: '10' }`.
+</Tip>
+
+## State Options
+
+When reading contract data, you can specify which blockchain state to query:
+
+- `LatestOptimisticBlock` - Fastest, uses the latest block (default)
+- `LatestCommittedBlock` - Uses the last finalized block
+- Specific block height or hash
+
+```tsx
+const data = useContractReadFunction({
+  contractAccountId: 'example.near',
+  functionName: 'get_value',
+  withStateAt: 'LatestCommittedBlock', // or 'LatestOptimisticBlock'
+});
+```

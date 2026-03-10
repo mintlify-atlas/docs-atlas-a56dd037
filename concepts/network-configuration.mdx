@@ -1,0 +1,384 @@
+---
+title: "Network Configuration"
+description: "Configure NEAR network settings and custom RPC endpoints"
+---
+
+## Overview
+
+Network configuration in `react-near-ts` determines which NEAR network your application connects to and how it communicates with the blockchain. The library provides built-in configurations for mainnet and testnet, plus the flexibility to customize RPC endpoints and network parameters.
+
+## Built-in Network Configurations
+
+### Mainnet
+
+Production environment for real transactions and assets.
+
+```tsx
+import { MainnetNearProvider } from 'react-near-ts';
+import { createMainnetClient } from 'near-api-ts';
+
+// Automatic mainnet configuration
+<MainnetNearProvider>
+  <App />
+</MainnetNearProvider>
+```
+
+**Default Settings:**
+- Network ID: `mainnet`
+- RPC Endpoint: Default mainnet RPC from `near-api-ts`
+- Explorer: `https://nearblocks.io`
+
+### Testnet
+
+Development environment for testing without real assets.
+
+```tsx
+import { TestnetNearProvider } from 'react-near-ts';
+import { createTestnetClient } from 'near-api-ts';
+
+// Automatic testnet configuration
+<TestnetNearProvider>
+  <App />
+</TestnetNearProvider>
+```
+
+**Default Settings:**
+- Network ID: `testnet`
+- RPC Endpoint: Default testnet RPC from `near-api-ts`
+- Explorer: `https://testnet.nearblocks.io`
+
+<Tip>
+  Use testnet during development to avoid spending real NEAR tokens. Switch to mainnet only when you're ready to deploy.
+</Tip>
+
+## Custom Network Configuration
+
+For advanced use cases, you can create a custom network configuration using the `NearProvider` with a custom client.
+
+### Custom RPC Endpoint
+
+Connect to a specific RPC endpoint for improved performance or reliability:
+
+```tsx
+import { NearProvider, createNearStore } from 'react-near-ts';
+import { createNearConnectorService } from 'react-near-ts';
+import { createClient } from 'near-api-ts';
+
+// Create a custom client with specific RPC endpoint
+const createCustomClient = () => {
+  return createClient({
+    networkId: 'mainnet',
+    rpcUrl: 'https://your-custom-rpc.com',
+  });
+};
+
+// Create store with custom configuration
+const customStore = createNearStore({
+  networkId: 'mainnet',
+  clientCreator: createCustomClient,
+  serviceCreator: createNearConnectorService({ networkId: 'mainnet' }),
+});
+
+function App() {
+  return (
+    <NearProvider nearStore={customStore}>
+      <YourApp />
+    </NearProvider>
+  );
+}
+```
+
+### Multiple RPC Endpoints (Fallback)
+
+Implement fallback logic for resilient connections:
+
+```tsx
+import { createClient } from 'near-api-ts';
+
+const RPC_ENDPOINTS = [
+  'https://primary-rpc.com',
+  'https://fallback-rpc.com',
+  'https://backup-rpc.com',
+];
+
+const createResilientClient = () => {
+  // Try endpoints in order until one works
+  for (const rpcUrl of RPC_ENDPOINTS) {
+    try {
+      return createClient({
+        networkId: 'mainnet',
+        rpcUrl,
+      });
+    } catch (error) {
+      console.warn(`Failed to connect to ${rpcUrl}`, error);
+    }
+  }
+  throw new Error('All RPC endpoints failed');
+};
+
+const store = createNearStore({
+  networkId: 'mainnet',
+  clientCreator: createResilientClient,
+  serviceCreator: createNearConnectorService({ networkId: 'mainnet' }),
+});
+```
+
+## Network ID Configuration
+
+The `networkId` parameter is critical and must match between multiple components:
+
+```tsx
+const store = createNearStore({
+  networkId: 'mainnet', // ← Must match
+  clientCreator: createMainnetClient,
+  serviceCreator: createNearConnectorService({ 
+    networkId: 'mainnet' // ← Must match
+  }),
+});
+```
+
+<Warning>
+  Mismatched network IDs between the store and service creator will cause connection failures.
+</Warning>
+
+### Supported Network IDs
+
+<CodeGroup>
+```tsx Mainnet
+networkId: 'mainnet'
+```
+
+```tsx Testnet
+networkId: 'testnet'
+```
+</CodeGroup>
+
+## Store Architecture
+
+The store is built with Zustand and manages:
+
+1. **Network State**: Current network ID
+2. **Client Instance**: NEAR RPC client
+3. **Service Context**: Wallet connector and other services
+4. **Account State**: Connected account information
+
+<Accordion title="View store creation implementation">
+```tsx src/store/nearStore.ts
+import { createStore } from 'zustand/vanilla';
+import { persist } from 'zustand/middleware';
+
+export const createNearStore = (args) => {
+  const { storeName = 'react-near-ts', networkId, clientCreator, serviceCreator } = args;
+  const serviceCreators = [serviceCreator];
+
+  // Initialize services
+  const services = serviceCreators.reduce(
+    (acc, creator) => {
+      acc[creator.serviceId] = creator.createService();
+      return acc;
+    },
+    {} as Record<ServiceId, Service>,
+  );
+
+  // Create context with client and services
+  const context: StoreContext = {
+    serviceCreators,
+    client: clientCreator(),
+    services,
+    signers: [],
+  };
+
+  // Create store with persistence
+  return createStore<NearState>()(persist(
+    (set) => ({
+      networkId,
+      connectedAccountId: undefined,
+      getContext: () => context,
+      setSigners: (connectedAccountId) => { /* ... */ },
+      clearSigners: () => { /* ... */ },
+      setConnectedAccountId: (connectedAccountId) => {
+        set(() => ({ connectedAccountId }));
+      },
+    }),
+    {
+      name: `${storeName}:${networkId}`,
+      version: 1,
+      partialize: (s) => ({ connectedAccountId: s.connectedAccountId }),
+    },
+  ));
+};
+```
+</Accordion>
+
+## Environment-Based Configuration
+
+Switch networks based on environment variables:
+
+```tsx
+import { MainnetNearProvider, TestnetNearProvider } from 'react-near-ts';
+
+const isProduction = import.meta.env.PROD;
+
+function App() {
+  const Provider = isProduction ? MainnetNearProvider : TestnetNearProvider;
+  
+  return (
+    <Provider>
+      <YourApp />
+    </Provider>
+  );
+}
+```
+
+### With Environment Variables
+
+```tsx .env.development
+VITE_NEAR_NETWORK=testnet
+VITE_NEAR_RPC_URL=https://rpc.testnet.near.org
+```
+
+```tsx .env.production
+VITE_NEAR_NETWORK=mainnet
+VITE_NEAR_RPC_URL=https://rpc.mainnet.near.org
+```
+
+```tsx App.tsx
+import { NearProvider, createNearStore } from 'react-near-ts';
+import { createClient } from 'near-api-ts';
+import { createNearConnectorService } from 'react-near-ts';
+
+const networkId = import.meta.env.VITE_NEAR_NETWORK;
+const rpcUrl = import.meta.env.VITE_NEAR_RPC_URL;
+
+const createEnvClient = () => createClient({ networkId, rpcUrl });
+
+const store = createNearStore({
+  networkId,
+  clientCreator: createEnvClient,
+  serviceCreator: createNearConnectorService({ networkId }),
+});
+
+function App() {
+  return (
+    <NearProvider nearStore={store}>
+      <YourApp />
+    </NearProvider>
+  );
+}
+```
+
+## Local Storage Keys
+
+The store uses localStorage to persist connection state:
+
+```
+Key format: ${storeName}:${networkId}
+
+Examples:
+- react-near-ts:mainnet
+- react-near-ts:testnet
+- my-custom-app:mainnet
+```
+
+This allows multiple apps or multiple network configurations to coexist without conflicts.
+
+<Info>
+  You can customize the storage key using the `storeName` parameter in `createNearStore`.
+</Info>
+
+## Network Switching
+
+To support network switching at runtime, manage multiple stores:
+
+```tsx
+import { useState } from 'react';
+import { NearProvider, createNearStore } from 'react-near-ts';
+import { createMainnetClient, createTestnetClient } from 'near-api-ts';
+import { createNearConnectorService } from 'react-near-ts';
+
+const stores = {
+  mainnet: createNearStore({
+    networkId: 'mainnet',
+    clientCreator: createMainnetClient,
+    serviceCreator: createNearConnectorService({ networkId: 'mainnet' }),
+  }),
+  testnet: createNearStore({
+    networkId: 'testnet',
+    clientCreator: createTestnetClient,
+    serviceCreator: createNearConnectorService({ networkId: 'testnet' }),
+  }),
+};
+
+function App() {
+  const [network, setNetwork] = useState<'mainnet' | 'testnet'>('testnet');
+  
+  return (
+    <>
+      <NetworkSelector value={network} onChange={setNetwork} />
+      <NearProvider nearStore={stores[network]}>
+        <YourApp />
+      </NearProvider>
+    </>
+  );
+}
+```
+
+<Warning>
+  Switching networks will disconnect the current wallet session. Users will need to reconnect after switching.
+</Warning>
+
+## Best Practices
+
+<Check>
+  **Do**: Use testnet for development and testing
+</Check>
+
+<Check>
+  **Do**: Keep network ID consistent across store and services
+</Check>
+
+<Check>
+  **Do**: Use environment variables for network configuration
+</Check>
+
+<Warning>
+  **Don't**: Hardcode mainnet RPC URLs in development builds
+</Warning>
+
+<Warning>
+  **Don't**: Switch networks without disconnecting the wallet first
+</Warning>
+
+## Troubleshooting
+
+### Network ID Mismatch
+
+```
+Error: Network ID mismatch between client and service
+```
+
+**Solution**: Ensure the `networkId` matches in both `createNearStore` and `createNearConnectorService`.
+
+### RPC Connection Failed
+
+```
+Error: Failed to connect to RPC endpoint
+```
+
+**Solutions**:
+- Check your internet connection
+- Verify the RPC URL is correct
+- Try a different RPC endpoint
+- Check for CORS issues in browser console
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Wallet Connection" icon="wallet" href="/concepts/wallet-connection">
+    Learn how to connect and manage wallets
+  </Card>
+  
+  <Card title="Providers" icon="server" href="/concepts/providers">
+    Understand provider configuration options
+  </Card>
+</CardGroup>

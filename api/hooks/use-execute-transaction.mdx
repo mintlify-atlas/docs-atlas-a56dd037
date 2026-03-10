@@ -1,0 +1,476 @@
+---
+title: useExecuteTransaction
+description: Hook for executing state-changing transactions on NEAR
+---
+
+## Overview
+
+`useExecuteTransaction` executes state-changing transactions on NEAR Protocol. It handles transaction signing, submission, and confirmation using the connected wallet. Built on TanStack Query's mutation system for loading states and error handling.
+
+## Import
+
+```typescript
+import { useExecuteTransaction } from 'react-near-ts';
+```
+
+## Type Signature
+
+```typescript
+type UseExecuteTransaction = () => UseMutationResult<
+  ExecuteTransactionOutput,
+  Error,
+  ExecuteTransactionArgs,
+  unknown
+>;
+
+type ExecuteTransactionArgs = {
+  intent: TransactionIntent;
+};
+
+type ExecuteTransactionOutput = {
+  rawRpcResult: unknown;
+};
+```
+
+Source: [types/hooks/useExecuteTransaction.ts:9](https://github.com/hot-labs/react-near-ts/blob/main/types/hooks/useExecuteTransaction.ts#L9)
+
+## Parameters
+
+The `mutate` function accepts a single argument:
+
+<ParamField path="intent" type="TransactionIntent" required>
+  Transaction intent describing the action to execute.
+  
+  <Expandable title="properties">
+    <ParamField path="intent.action" type="Action" required>
+      The action to perform. Created using helper functions:
+      - `transfer({ amount })` - Transfer NEAR tokens
+      - `functionCall({ functionName, functionArgs, gasLimit, depositAmount })` - Call contract function
+      - `createAccount()` - Create a new account
+      - `deleteAccount({ beneficiaryAccountId })` - Delete an account
+      - More actions available from `near-api-ts`
+    </ParamField>
+    
+    <ParamField path="intent.receiverAccountId" type="AccountId" required>
+      The account that will receive/process the transaction.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Return Value
+
+<ResponseField name="mutate" type="(args: ExecuteTransactionArgs, options?) => void">
+  Executes the transaction. Does not return a value directly (use `mutateAsync` for promises).
+  
+  Second parameter accepts TanStack Query mutation options:
+  - `onSuccess(data, variables, context)` - Called on successful transaction
+  - `onError(error, variables, context)` - Called on transaction error
+  - `onSettled(data, error, variables, context)` - Called on completion (success or error)
+</ResponseField>
+
+<ResponseField name="mutateAsync" type="(args: ExecuteTransactionArgs) => Promise<ExecuteTransactionOutput>">
+  Async version of mutate that returns a promise with the transaction result.
+</ResponseField>
+
+<ResponseField name="data" type="ExecuteTransactionOutput | undefined">
+  Transaction result data when the mutation succeeds.
+  
+  <Expandable title="properties">
+    <ResponseField name="rawRpcResult" type="object">
+      Raw RPC response from the NEAR node, including transaction hash, receipts, and outcome.
+      
+      Contains:
+      - `transaction.hash` - Transaction hash
+      - `receipts_outcome` - Receipt execution results
+      - `status` - Transaction status
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="isPending" type="boolean">
+  `true` while the transaction is being processed.
+</ResponseField>
+
+<ResponseField name="isSuccess" type="boolean">
+  `true` if the transaction completed successfully.
+</ResponseField>
+
+<ResponseField name="isError" type="boolean">
+  `true` if the transaction failed.
+</ResponseField>
+
+<ResponseField name="error" type="Error | null">
+  Error object if the transaction failed. Contains error message and details.
+</ResponseField>
+
+<ResponseField name="reset" type="() => void">
+  Resets the mutation state to idle.
+</ResponseField>
+
+## Usage
+
+### Transfer NEAR Tokens
+
+```typescript
+import { useExecuteTransaction, transfer } from 'react-near-ts';
+
+function SendNear() {
+  const executeTransaction = useExecuteTransaction();
+
+  const handleSend = () => {
+    executeTransaction.mutate({
+      intent: {
+        action: transfer({ amount: { near: '1' } }),
+        receiverAccountId: 'receiver.testnet',
+      },
+    });
+  };
+
+  return (
+    <div>
+      <button 
+        onClick={handleSend}
+        disabled={executeTransaction.isPending}
+      >
+        {executeTransaction.isPending ? 'Sending...' : 'Send 1 NEAR'}
+      </button>
+
+      {executeTransaction.isSuccess && (
+        <p>Transaction successful!</p>
+      )}
+
+      {executeTransaction.isError && (
+        <p>Error: {executeTransaction.error.message}</p>
+      )}
+    </div>
+  );
+}
+```
+
+### Call Contract Function
+
+```typescript
+import { useExecuteTransaction, functionCall } from 'react-near-ts';
+
+function AddRecord() {
+  const executeTransaction = useExecuteTransaction();
+  const [record, setRecord] = useState('');
+
+  const handleAdd = () => {
+    executeTransaction.mutate({
+      intent: {
+        action: functionCall({
+          functionName: 'add_record',
+          functionArgs: { record },
+          gasLimit: { teraGas: '10' },
+        }),
+        receiverAccountId: 'contract.testnet',
+      },
+    });
+  };
+
+  return (
+    <div>
+      <input
+        value={record}
+        onChange={(e) => setRecord(e.target.value)}
+        placeholder="Enter record"
+      />
+      <button onClick={handleAdd} disabled={!record}>
+        Add Record
+      </button>
+    </div>
+  );
+}
+```
+
+### With Success Callback
+
+```typescript
+import { useExecuteTransaction, transfer } from 'react-near-ts';
+
+function SendWithConfirmation() {
+  const executeTransaction = useExecuteTransaction();
+
+  const handleSend = () => {
+    executeTransaction.mutate(
+      {
+        intent: {
+          action: transfer({ amount: { near: '0.1' } }),
+          receiverAccountId: 'receiver.testnet',
+        },
+      },
+      {
+        onSuccess: (data) => {
+          console.log('Transaction hash:', data.rawRpcResult.transaction.hash);
+          alert('Tokens sent successfully!');
+        },
+        onError: (error) => {
+          console.error('Transaction failed:', error);
+          alert('Failed to send tokens');
+        },
+      }
+    );
+  };
+
+  return <button onClick={handleSend}>Send NEAR</button>;
+}
+```
+
+### With Query Invalidation
+
+```typescript
+import { useExecuteTransaction, functionCall } from 'react-near-ts';
+
+function AddRecordWithRefresh() {
+  const executeTransaction = useExecuteTransaction();
+
+  const handleAdd = (record: string) => {
+    executeTransaction.mutate(
+      {
+        intent: {
+          action: functionCall({
+            functionName: 'add_record',
+            functionArgs: { record },
+            gasLimit: { teraGas: '10' },
+          }),
+          receiverAccountId: 'contract.testnet',
+        },
+      },
+      {
+        onSuccess: (_data, _variables, context) => {
+          // Invalidate and refetch records query
+          context.client.invalidateQueries({
+            queryKey: ['callContractReadFunction', 'contract.testnet', 'get_records'],
+          });
+        },
+      }
+    );
+  };
+
+  return (
+    <button onClick={() => handleAdd('New record')}>
+      Add Record
+    </button>
+  );
+}
+```
+
+### Using Async Version
+
+```typescript
+import { useExecuteTransaction, transfer } from 'react-near-ts';
+
+function AsyncSend() {
+  const executeTransaction = useExecuteTransaction();
+
+  const handleSend = async () => {
+    try {
+      const result = await executeTransaction.mutateAsync({
+        intent: {
+          action: transfer({ amount: { near: '1' } }),
+          receiverAccountId: 'receiver.testnet',
+        },
+      });
+
+      console.log('Transaction hash:', result.rawRpcResult.transaction.hash);
+      // Continue with additional logic
+    } catch (error) {
+      console.error('Transaction failed:', error);
+    }
+  };
+
+  return <button onClick={handleSend}>Send</button>;
+}
+```
+
+### Transfer with YoctoNEAR
+
+```typescript
+import { useExecuteTransaction, transfer } from 'react-near-ts';
+
+function SendYoctoNear() {
+  const executeTransaction = useExecuteTransaction();
+
+  const handleSend = () => {
+    executeTransaction.mutate({
+      intent: {
+        action: transfer({ 
+          amount: { yoctoNear: '1000000000000000000000000' } // 1 NEAR
+        }),
+        receiverAccountId: 'receiver.testnet',
+      },
+    });
+  };
+
+  return <button onClick={handleSend}>Send 1 NEAR</button>;
+}
+```
+
+### Function Call with Deposit
+
+```typescript
+import { useExecuteTransaction, functionCall } from 'react-near-ts';
+
+function StakeTokens() {
+  const executeTransaction = useExecuteTransaction();
+
+  const handleStake = () => {
+    executeTransaction.mutate({
+      intent: {
+        action: functionCall({
+          functionName: 'stake',
+          functionArgs: {},
+          gasLimit: { teraGas: '50' },
+          depositAmount: { near: '10' }, // Attach 10 NEAR
+        }),
+        receiverAccountId: 'staking.testnet',
+      },
+    });
+  };
+
+  return <button onClick={handleStake}>Stake 10 NEAR</button>;
+}
+```
+
+### Complete Form Example
+
+```typescript
+import { useState } from 'react';
+import { useExecuteTransaction, transfer, useConnectedAccount } from 'react-near-ts';
+
+function TransferForm() {
+  const { isConnectedAccount } = useConnectedAccount();
+  const executeTransaction = useExecuteTransaction();
+  const [amount, setAmount] = useState('');
+  const [receiver, setReceiver] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    executeTransaction.mutate(
+      {
+        intent: {
+          action: transfer({ amount: { near: amount } }),
+          receiverAccountId: receiver,
+        },
+      },
+      {
+        onSuccess: () => {
+          setAmount('');
+          setReceiver('');
+        },
+      }
+    );
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        type="text"
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        placeholder="Amount in NEAR"
+        required
+      />
+      <input
+        type="text"
+        value={receiver}
+        onChange={(e) => setReceiver(e.target.value)}
+        placeholder="Receiver account ID"
+        required
+      />
+      <button 
+        type="submit" 
+        disabled={!isConnectedAccount || executeTransaction.isPending}
+      >
+        {executeTransaction.isPending ? 'Sending...' : 'Send NEAR'}
+      </button>
+
+      {executeTransaction.isSuccess && (
+        <p style={{ color: 'green' }}>Transfer successful!</p>
+      )}
+
+      {executeTransaction.isError && (
+        <p style={{ color: 'red' }}>
+          Error: {executeTransaction.error.message}
+        </p>
+      )}
+    </form>
+  );
+}
+```
+
+## Behavior
+
+1. **Transaction Creation:** Constructs transaction from the provided intent
+2. **Signing:** Uses the connected wallet to sign the transaction
+3. **Submission:** Submits signed transaction to NEAR network
+4. **Confirmation:** Waits for transaction to be processed and confirmed
+5. **Result:** Returns transaction outcome with hash and receipts
+
+## Error Handling
+
+Transactions can fail for various reasons:
+
+- Insufficient balance
+- Gas limit exceeded
+- Function execution failure (panic, assertion)
+- Invalid receiver account
+- User rejected in wallet
+- Network errors
+
+```typescript
+if (executeTransaction.isError) {
+  const error = executeTransaction.error;
+  console.error('Transaction error:', error.message);
+  // Handle specific error cases
+}
+```
+
+## Common Patterns
+
+### Reset After Error
+
+```typescript
+const executeTransaction = useExecuteTransaction();
+
+// Reset mutation state to allow retry
+useEffect(() => {
+  if (executeTransaction.isError) {
+    const timer = setTimeout(() => executeTransaction.reset(), 3000);
+    return () => clearTimeout(timer);
+  }
+}, [executeTransaction.isError]);
+```
+
+### Loading Indicator
+
+```typescript
+if (executeTransaction.isPending) {
+  return <LoadingSpinner message="Processing transaction..." />;
+}
+```
+
+## Related Hooks
+
+- [useNearConnector](/api/hooks/use-near-connector) - Connect wallet to enable transactions
+- [useConnectedAccount](/api/hooks/use-connected-account) - Check if wallet is connected
+- [useContractReadFunction](/api/hooks/use-contract-read-function) - Read contract state
+
+## Related Functions
+
+- `transfer()` - Create transfer action
+- `functionCall()` - Create function call action
+- `createAccount()` - Create account action
+- `deleteAccount()` - Delete account action
+
+## Type Definitions
+
+Source: [types/hooks/useExecuteTransaction.ts](https://github.com/hot-labs/react-near-ts/blob/main/types/hooks/useExecuteTransaction.ts)
+
+## Examples from Playground
+
+See real-world implementations:
+- [Send NEAR Page](https://github.com/hot-labs/react-near-ts/blob/main/playgrounds/next-app-router/src/app/send-near/page.tsx#L20)
+- [useAddRecord Hook](https://github.com/hot-labs/react-near-ts/blob/main/playgrounds/next-app-router/src/app/contract-records/useAddRecord.ts)

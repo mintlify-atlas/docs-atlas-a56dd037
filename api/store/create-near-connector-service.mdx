@@ -1,0 +1,254 @@
+---
+title: createNearConnectorService
+description: Create a service creator for NEAR wallet connection functionality
+---
+
+## Overview
+
+Creates a service creator that provides wallet connection functionality through `@hot-labs/near-connect`. This service creator is used by `createNearStore()` to enable wallet connect/disconnect operations and transaction signing.
+
+## Function Signature
+
+```typescript
+function createNearConnectorService(
+  args: { networkId: NearConnectNetworkId }
+): NearConnectServiceCreator
+```
+
+### Type Definitions
+
+```typescript
+type NearConnectNetworkId = 'mainnet' | 'testnet';
+
+type NearConnectServiceCreator = ServiceCreator<
+  'nearConnector',
+  { connector: NearConnector }
+>;
+
+type ServiceCreator<ServiceId, ServiceBox> = {
+  serviceId: ServiceId;
+  createService(): Service<ServiceId, ServiceBox>;
+  createSigner(args: {
+    signerAccountId: AccountId;
+    serviceBox: ServiceBox;
+    client: Client;
+  }): Signer<ServiceId>;
+};
+
+type Service<ServiceId, ServiceBox> = {
+  serviceId: ServiceId;
+  serviceBox: ServiceBox;
+};
+
+type Signer<ServiceId> = {
+  serviceId: ServiceId;
+  safeExecuteTransaction(args: {
+    intent: TransactionIntent;
+  }): Promise<Result<ExecuteTransactionOutput, unknown>>;
+};
+```
+
+## Parameters
+
+<ParamField path="networkId" type="'mainnet' | 'testnet'" required>
+  The NEAR network identifier. Must be either `'mainnet'` for production or `'testnet'` for testing. This determines which network the wallet connector will use.
+</ParamField>
+
+## Returns
+
+<ResponseField name="NearConnectServiceCreator" type="ServiceCreator">
+  A service creator object that provides wallet connection functionality.
+
+  <Expandable title="ServiceCreator properties">
+    <ResponseField name="serviceId" type="'nearConnector'">
+      The unique identifier for this service: `'nearConnector'`.
+    </ResponseField>
+
+    <ResponseField name="createService" type="() => Service">
+      Creates and returns a service instance containing the NearConnector.
+
+      <Expandable title="Service structure">
+        <ResponseField name="serviceId" type="'nearConnector'">
+          The service identifier.
+        </ResponseField>
+
+        <ResponseField name="serviceBox" type="{ connector: NearConnector }">
+          Container object holding the NearConnector instance from `@hot-labs/near-connect`.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+
+    <ResponseField name="createSigner" type="(args) => Signer">
+      Creates a signer instance for executing transactions from a connected wallet.
+
+      <Expandable title="Parameters">
+        <ResponseField name="signerAccountId" type="AccountId">
+          The account ID of the connected wallet.
+        </ResponseField>
+
+        <ResponseField name="serviceBox" type="{ connector: NearConnector }">
+          The service box containing the connector instance.
+        </ResponseField>
+
+        <ResponseField name="client" type="Client">
+          The NEAR API client instance.
+        </ResponseField>
+      </Expandable>
+
+      <Expandable title="Returns: Signer">
+        <ResponseField name="serviceId" type="'nearConnector'">
+          The service identifier.
+        </ResponseField>
+
+        <ResponseField name="safeExecuteTransaction" type="(args) => Promise<Result>">
+          Safely executes a transaction using the connected wallet. Returns a Result type containing either the transaction output or an error.
+
+          <Expandable title="Transaction args">
+            <ResponseField name="intent" type="TransactionIntent">
+              The transaction intent containing the action and receiver account ID.
+            </ResponseField>
+          </Expandable>
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Usage
+
+### Mainnet Configuration
+
+```tsx
+import {
+  createNearStore,
+  createMainnetClient,
+  createNearConnectorService,
+} from 'react-near-ts';
+
+const nearStore = createNearStore({
+  networkId: 'mainnet',
+  clientCreator: createMainnetClient,
+  serviceCreator: createNearConnectorService({ networkId: 'mainnet' }),
+});
+```
+
+### Testnet Configuration
+
+```tsx
+import {
+  createNearStore,
+  createTestnetClient,
+  createNearConnectorService,
+} from 'react-near-ts';
+
+const nearStore = createNearStore({
+  networkId: 'testnet',
+  clientCreator: createTestnetClient,
+  serviceCreator: createNearConnectorService({ networkId: 'testnet' }),
+});
+```
+
+### Custom Client with Service Creator
+
+```tsx
+import {
+  createNearStore,
+  createClient,
+  createNearConnectorService,
+} from 'react-near-ts';
+
+const clientCreator = () => createClient({
+  transport: {
+    rpcEndpoints: {
+      regular: [{ url: 'https://free.rpc.fastnear.com' }],
+      archival: [{ url: 'https://1rpc.io/near' }],
+    },
+  },
+});
+
+const nearStore = createNearStore({
+  networkId: 'mainnet',
+  clientCreator,
+  serviceCreator: createNearConnectorService({ networkId: 'mainnet' }),
+});
+```
+
+### Complete Provider Setup
+
+```tsx
+import {
+  NearProvider,
+  createNearStore,
+  createClient,
+  createNearConnectorService,
+} from 'react-near-ts';
+
+const clientCreator = () => createClient({
+  transport: {
+    rpcEndpoints: {
+      regular: [{ url: 'https://free.rpc.fastnear.com' }],
+      archival: [{ url: 'https://1rpc.io/near' }],
+    },
+  },
+});
+
+const nearStore = createNearStore({
+  networkId: 'mainnet',
+  clientCreator,
+  serviceCreator: createNearConnectorService({ networkId: 'mainnet' }),
+});
+
+export const App = ({ children }: { children: React.ReactNode }) => (
+  <NearProvider nearStore={nearStore}>{children}</NearProvider>
+);
+```
+
+## Implementation Details
+
+The service creator follows a two-phase initialization pattern:
+
+1. **Service Creation** (`createService`) - Instantiates the `NearConnector` with the specified network. This happens once when the store is created.
+
+2. **Signer Creation** (`createSigner`) - Creates a signer instance when a wallet connects. The signer provides the `safeExecuteTransaction` method that wraps transaction execution with error handling.
+
+The service creator is designed to be extensible, allowing for future support of multiple wallet connection services in the same store.
+
+## Service Architecture
+
+The service follows this structure:
+
+```typescript
+{
+  serviceId: 'nearConnector',
+  createService: () => {
+    const connector = new NearConnector({ network: networkId });
+    return {
+      serviceId: 'nearConnector',
+      serviceBox: { connector },
+    };
+  },
+  createSigner: ({ serviceBox }) => {
+    return {
+      serviceId: 'nearConnector',
+      safeExecuteTransaction: createSafeExecuteTransaction(serviceBox.connector),
+    };
+  },
+}
+```
+
+The `serviceBox` acts as a container for the connector instance, making it accessible to both the service and signer contexts.
+
+## Transaction Execution
+
+The signer's `safeExecuteTransaction` method:
+
+- Accepts a `TransactionIntent` with the action and receiver
+- Uses the connected wallet to sign and submit the transaction
+- Returns a `Result` type that safely encapsulates success or failure
+- Provides raw RPC result on success for further processing
+
+## Related
+
+- [createNearStore](/api/store/create-near-store) - Create the NEAR store using this service creator
+- [useNearConnector](/api/hooks/use-near-connector) - React hook for wallet connection using this service
+- [useExecuteTransaction](/api/hooks/use-execute-transaction) - React hook for transaction execution
